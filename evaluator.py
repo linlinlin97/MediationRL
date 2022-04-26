@@ -86,9 +86,9 @@ class evaluator:
         intercept_ME = self.compute_ME(data_num, self.state)
         intercept_SE = self.compute_SE(data_num, self.state)
         
-        self.eta_pia0 = self.eta_pi - intercept_DE
-        self.eta_pia0star = self.eta_pia0 - intercept_ME
-        self.eta_a0 = self.eta_pia0star - intercept_SE
+        self.eta_pia0 = self.eta_pi - np.mean(intercept_DE)
+        self.eta_pia0star = self.eta_pia0 - np.mean(intercept_ME)
+        self.eta_a0 = self.eta_pia0star - np.mean(intercept_SE)
         
         termI1 = self.compute_termI1(data_num, self.state, self.action, self.reward, self.next_state)
         termI2 = self.compute_termI2(data_num, self.state, self.action, self.reward, self.next_state, self.mediator)
