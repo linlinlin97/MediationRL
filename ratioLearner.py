@@ -3,7 +3,7 @@ from numpy.linalg import inv
 from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
-    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20):
+    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, l2penalty = 10**(-9)):
 
         self.state = np.copy(dataset['state'])
         self.action = np.copy(dataset['action']).reshape(-1, 1)
@@ -17,8 +17,9 @@ class RatioLinearLearner:
         self.beta_target = None
         self.beta_control = None
         self.rbf_feature = RBFSampler(random_state=1, n_components=ndim)
-        self.rbf_feature.fit(np.vstack((self.state, self.s0)))
+        self.rbf_feature.fit(np.vstack((self.s0, self.next_state)))
         self.truncate = truncate
+        self.l2penalty = l2penalty
         
         self.palearner = palearner
         pass
@@ -66,6 +67,11 @@ class RatioLinearLearner:
         
         X = np.vstack((design_matrix_up, design_matrix_down))
         XTX = np.matmul(X.T, X)
+        #print(XTX)
+        if self.l2penalty is not None:
+            penalty_matrix = np.diagflat(np.repeat(self.l2penalty, XTX.shape[0]))
+            XTX += penalty_matrix
+        #print('+',XTX )
         inv_design_matrix = inv(XTX)
 
         beta_target = np.matmul(inv_design_matrix, design_matrix_down.reshape(-1, 1))
@@ -101,3 +107,27 @@ class RatioLinearLearner:
 
     def get_r_prediction(self, state, policy = 'target', normalize=True):
         return self.get_ratio_prediction(state, policy, normalize)
+    
+    
+    def goodness_of_fit(self,test_dataset):
+        np.random.seed(1)        
+        psi = self.feature_engineering(test_dataset['state'])
+        psi_next = self.feature_engineering(test_dataset['next_state'])
+
+        estimate_pa = self.palearner.get_pa_prediction(test_dataset['state'], test_dataset['action'])
+        target_pa = self.policy_pa(self.target_policy, test_dataset['state'], test_dataset['action'])
+        control_pa = self.policy_pa(self.control_policy, test_dataset['state'], test_dataset['action'])
+        pa_ratio_target = target_pa / estimate_pa
+        pa_ratio_control = control_pa / estimate_pa
+        
+        psi_minus_psi_next_target = self.rbf_difference(psi, psi_next, pa_ratio_target)
+        psi_minus_psi_next_control = self.rbf_difference(psi, psi_next, pa_ratio_control)
+
+        rmse_target = [np.matmul(np.matmul(psi_minus_psi_next_target[i].reshape(-1, 1), psi[i].reshape(1, -1)),self.beta_target) for i in range(test_dataset['state'].shape[0])]
+        rmse_target = [np.vstack([rmse_target[i], np.matmul(psi[i].reshape(1, -1),self.beta_target)-1]) for i in range(test_dataset['state'].shape[0])]
+        rmse_target = np.sqrt(np.mean(np.square(np.mean(rmse_target,axis=0)))) 
+        
+        rmse_control = [np.matmul(np.matmul(psi_minus_psi_next_control[i].reshape(-1, 1), psi[i].reshape(1, -1)),self.beta_control) for i in range(test_dataset['state'].shape[0])]
+        rmse_control = [np.vstack([rmse_control[i], np.matmul(psi[i].reshape(1, -1),self.beta_control)-1]) for i in range(test_dataset['state'].shape[0])]
+        rmse_control = np.sqrt(np.mean(np.square(np.mean(rmse_control,axis=0)))) 
+        return rmse_target, rmse_control
