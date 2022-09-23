@@ -27,7 +27,8 @@ class iden():
         return S
     
 class Qlearner():
-    def __init__(self, data, target_policy, control_policy, pmlearner, rewardlearner, ratiolearner, palearner, unique_action, dim_state, dim_mediator, scaler = 'Identity', expectation_MCMC_iter = 100):  
+    def __init__(self, data, target_policy, control_policy, pmlearner, rewardlearner, ratiolearner, palearner, unique_action, dim_state, dim_mediator, scaler = 'Identity', expectation_MCMC_iter_Q3 = 100, expectation_MCMC_iter_Q_diff = 100, seed = 0 ):
+        np.random.seed(seed)
         self.unique_action = unique_action
         self.nums_action = len(unique_action)
         self.data = data
@@ -44,7 +45,8 @@ class Qlearner():
         self.rewardlearner = rewardlearner
         self.B_spline(L = max(7,self.L+3), d = 3)
         
-        self.expectation_MCMC_iter = expectation_MCMC_iter
+        self.expectation_MCMC_iter_Q3 = expectation_MCMC_iter_Q3
+        self.expectation_MCMC_iter_Q_diff = expectation_MCMC_iter_Q_diff
         
         self.state = self.data['state']
         self.mediator = self.data['mediator']
@@ -68,7 +70,7 @@ class Qlearner():
         self.eta_piea0, self.Q2_diff, self.Q2_est_beta = self.Q_diff_eta(self.tuples_target, Er_Sa0M, self.target_policy)
         #Q3 
         Er_Sa0m = []
-        for rep in range(self.expectation_MCMC_iter):
+        for rep in range(self.expectation_MCMC_iter_Q3):
             m_Sa0 = self.pmlearner.sample_m(self.state, self.a0, random = True)
             r_Sa0m = self.rewardlearner.get_reward_prediction(self.state, self.a0, m_Sa0)
             Er_Sa0m.append(r_Sa0m)
@@ -191,14 +193,14 @@ class Qlearner():
         Q_Snext_am = np.zeros(len(action), dtype=float)
         #MCMC to get the mean over m
         Q_SAm = []
-        for rep in range(self.expectation_MCMC_iter):
+        for rep in range(self.expectation_MCMC_iter_Q_diff):
             m_SA = self.pmlearner.sample_m(state, action, random = True)
             out_Q = [self.Q(state[i], m_SA[i], action[i], est_beta) for i in range(len(action))]
             Q_SAm.append(out_Q)
         for a in self.unique_action:
             pie_a = policy(next_state, a, matrix_based = True)
             Q_Snext_am_MC = []
-            for rep in range(self.expectation_MCMC_iter):
+            for rep in range(self.expectation_MCMC_iter_Q_diff):
                 m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
                 out_Q = [self.Q(next_state[i], m_Snext_a[i], a, est_beta) for i in range(len(action))]
                 Q_Snext_am_MC.append(out_Q)

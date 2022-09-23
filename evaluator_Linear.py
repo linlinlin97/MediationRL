@@ -192,8 +192,8 @@ class evaluator:
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
-                m_i_a = self.pmlearner.sample_m(state, a, random = True)
-                reward_i_a = self.rewardlearner.get_reward_prediction(state, a, m_i_a)
+                m_i_a = self.pmlearner.sample_m(state,  np.array([a]), random = True)
+                reward_i_a = self.rewardlearner.get_reward_prediction(state,  np.array([a]), m_i_a)
                 reward_i_a0 = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a)
                 sampled_reward_a.append(reward_i_a)
                 sampled_reward_a0.append(reward_i_a0)
@@ -211,7 +211,7 @@ class evaluator:
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
-                m_i_a = self.pmlearner.sample_m(state, a, random = True)
+                m_i_a = self.pmlearner.sample_m(state,  np.array([a]), random = True)
                 m_i_a0 = self.pmlearner.sample_m(state, self.a0, random = True)
                 reward_i_a = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a)
                 reward_i_a0 = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a0)
