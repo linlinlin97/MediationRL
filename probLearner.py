@@ -52,7 +52,7 @@ class PMLearner():
         std = dict()
         tree_model = dict()
         for i in range(self.dim_mediator):
-            regressor[i] = GridSearchCV(DecisionTreeRegressor(), self.parameters, n_jobs=-1)
+            regressor[i] = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor[i].fit(X=X, y=y[:,i])
             best_params[i] = regressor[i].best_params_
             print('mediator'+str(i),best_params[i])
@@ -73,7 +73,7 @@ class PMLearner():
         sample_var = dict()
         std = dict()
         for i in range(self.dim_mediator):
-            regressor[i] = GridSearchCV(DecisionTreeRegressor(), self.parameters, n_jobs=-1)
+            regressor[i] = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor[i].fit(X=X_train, y=y_train[:,i])
             best_params[i] = regressor[i].best_params_
             #print(best_params[i])
@@ -159,7 +159,7 @@ class RewardLearner():
             y_train = y[mask]
             y_test = y[~mask]
 
-            regressor = GridSearchCV(DecisionTreeRegressor(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X_train, y=y_train)
             best_params = regressor.best_params_
             #print(best_params)
@@ -169,7 +169,7 @@ class RewardLearner():
             self.sample_var_1 = np.sum(((y_Xb)-self.bias_1)**2)/(X_test.shape[0]-1)
             self.std_1 = np.sqrt(self.sample_var_1)
             
-            regressor = GridSearchCV(DecisionTreeRegressor(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
             self.tree_model = DecisionTreeRegressor(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
@@ -180,10 +180,10 @@ class RewardLearner():
             self.sample_var_2 = np.sum(((y_Xb)-self.bias_2)**2)/(X.shape[0]-1)
             self.std_2 = np.sqrt(self.sample_var_2)
         else:
-            regressor = GridSearchCV(DecisionTreeRegressor(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
-            print(best_params)
+            print('reward', best_params)
 
             self.tree_model = DecisionTreeRegressor(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
             self.tree_model.fit(X, y)
@@ -237,14 +237,14 @@ class PALearner():
             y_train = y[mask]
             y_test = y[~mask]
 
-            regressor = GridSearchCV(DecisionTreeClassifier(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeClassifier(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X_train, y=y_train)
             best_params = regressor.best_params_
             #print(best_params)
             self.score = regressor.best_estimator_.score(X_test, y_test)
   
             
-            regressor = GridSearchCV(DecisionTreeClassifier(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeClassifier(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
             self.tree_model = DecisionTreeClassifier(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
@@ -253,10 +253,10 @@ class PALearner():
             self.bias = np.mean(self.prob_A-.5)
             self.mse = np.mean((self.prob_A-.5)**2)
         else:
-            regressor = GridSearchCV(DecisionTreeClassifier(), self.parameters, n_jobs=-1)
+            regressor = GridSearchCV(DecisionTreeClassifier(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
-            print(best_params)
+            print('action', best_params)
             self.tree_model = DecisionTreeClassifier(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
             self.tree_model.fit(X, y)
             self.prob_A = self.tree_model.predict_proba(X)
