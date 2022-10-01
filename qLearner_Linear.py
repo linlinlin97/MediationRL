@@ -90,8 +90,8 @@ class Qlearner():
         #    stationary_fixed_policy_state_density = pickle.load(fp)    
      
         self.action = self.data['action']
-        pie_A = target_policy(self.state, self.action, matrix_based = True)
-        I_A = control_policy(self.state, self.action, matrix_based = True)
+        pie_A = target_policy(self.state, self.dim_state, self.action, matrix_based = True)
+        I_A = control_policy(self.state, self.dim_state, self.action, matrix_based = True)
         pieb_A = palearner.get_pa_prediction(self.state, self.action)
         #numerator_pie = np.exp(stationary_target_policy_state_density.score_samples(self.state.reshape(-1, 1)))
         #numerator_a0 = np.exp(stationary_fixed_policy_state_density.score_samples(self.state.reshape(-1, 1)))
@@ -117,7 +117,8 @@ class Qlearner():
         
     def B_spline(self, L = 3, d = 1):
         tuples = np.array(self.get_tuples(self.data))
-        scale_data = self.scaler.transform(tuples[:,[0,2]])
+        state_mediator_col = list(np.arange(self.dim_state)) + list(np.arange(self.dim_state+1,self.dim_state+1+self.dim_mediator)) 
+        scale_data = self.scaler.transform(tuples[:,state_mediator_col])
         knot = np.quantile(scale_data, np.linspace(0,1,L + 1), axis=0)
         self.bspline = []
         self.para_dim = 0 # last parameter is for eta estimation
@@ -135,7 +136,11 @@ class Qlearner():
         NT = len(data['state'])
         tuples = []
         for nt in range(NT):
-            tuple_t = list(data['state'][nt]) + [data['action'][nt], data['mediator'][nt], data['reward'][nt]] + list(data['next_state'][nt])
+            tuple_t = list(data['state'][nt]) 
+            tuple_t += [data['action'][nt]]
+            tuple_t += list(data['mediator'][nt])
+            tuple_t += [data['reward'][nt]]
+            tuple_t += list(data['next_state'][nt])
 
             tuples.append(tuple_t) #['state', 'action', 'mediator', 'reward', 'next_state']
         return tuples
@@ -198,7 +203,7 @@ class Qlearner():
             out_Q = [self.Q(state[i], m_SA[i], action[i], est_beta) for i in range(len(action))]
             Q_SAm.append(out_Q)
         for a in self.unique_action:
-            pie_a = policy(next_state, a, matrix_based = True)
+            pie_a = policy(next_state, self.dim_state, a, matrix_based = True)
             Q_Snext_am_MC = []
             for rep in range(self.expectation_MCMC_iter_Q_diff):
                 m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
@@ -213,8 +218,9 @@ class Qlearner():
         for nt in range(NT):
             tuple_t = [data['state'][nt], data['action'][nt], data['mediator'][nt], data['reward'][nt], data['next_state'][nt]]
             s_t1 = data['next_state'][nt]
-            policy_a_t1 = policy(state = s_t1, action = None)
+            policy_a_t1 = policy(state = s_t1, dim_state = self.dim_state, action = None)
             m_t1 =  self.pmlearner.sample_m(state = s_t1, action = policy_a_t1, random = True)
+            m_t1 = m_t1.reshape((self.dim_mediator,))
 
             tuple_t += [policy_a_t1, m_t1]
             tuples.append(tuple_t) #['state', 'action', 'mediator', 'reward', 'next_state', 'sampled_a_t+1', 'sampled_m_t+1' ]

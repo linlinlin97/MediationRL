@@ -3,14 +3,14 @@ from numpy.linalg import inv
 from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
-    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, l2penalty = 10**(-9)):
-
-        self.state = np.copy(dataset['state'])
+    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, dim_state = 1, l2penalty = 10**(-9)):
+        
+        self.dim_state = dim_state
+        self.state = np.copy(dataset['state']).reshape(-1, self.dim_state)
         self.action = np.copy(dataset['action']).reshape(-1, 1)
         self.unique_action = np.unique(dataset['action'])
-        self.mediator = np.copy(dataset['mediator']).reshape(-1, 1)
-        self.next_state = np.copy(dataset['next_state'])
-        self.s0 = np.copy(dataset['s0'])
+        self.next_state = np.copy(dataset['next_state']).reshape(-1, self.dim_state)
+        self.s0 = np.copy(dataset['s0']).reshape(-1, self.dim_state)
 
         self.target_policy = target_policy
         self.control_policy = control_policy
@@ -91,7 +91,7 @@ class RatioLinearLearner:
         if np.ndim(state) == 0 or np.ndim(state) == 1:
             x_state = np.reshape(state, (1, -1))
         else:
-            x_state = np.copy(state)
+            x_state = np.copy(state).reshape((-1,self.dim_state))
         psi = self.feature_engineering(x_state)
         if policy == 'target':
             ratio = np.matmul(psi, self.beta_target).flatten()
@@ -107,7 +107,6 @@ class RatioLinearLearner:
 
     def get_r_prediction(self, state, policy = 'target', normalize=True):
         return self.get_ratio_prediction(state, policy, normalize)
-    
     
     def goodness_of_fit(self,test_dataset):
         np.random.seed(1)        

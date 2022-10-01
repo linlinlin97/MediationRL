@@ -64,13 +64,17 @@ class evaluator:
         self.expectation_MCMC_iter_Q_diff = expectation_MCMC_iter_Q_diff
         
         self.qlearner = QLearner
-        self.pmlearner = PMLearner(dataset, problearner_parameters, seed)
+        self.pmlearner = PMLearner(dataset, problearner_parameters, seed, dim_state = dim_state,
+                                   dim_mediator = dim_mediator)
         self.pmlearner.train()
-        self.rewardlearner = RewardLearner(dataset, problearner_parameters, seed)
+        self.rewardlearner = RewardLearner(dataset, problearner_parameters, seed, dim_state = dim_state,
+                                           dim_mediator = dim_mediator)
         self.rewardlearner.train()
-        self.palearner = PALearner(dataset, problearner_parameters, seed, test = False)
+        self.palearner = PALearner(dataset, problearner_parameters, seed, test = False, dim_state = dim_state,
+                                   dim_mediator = dim_mediator)
         self.palearner.train()
-        self.ratiolearner = RatioLearner(dataset, target_policy, control_policy, self.palearner, ndim=ratio_ndim, truncate=truncate, l2penalty = l2penalty)
+        self.ratiolearner = RatioLearner(dataset, target_policy, control_policy, self.palearner, ndim=ratio_ndim,
+                                         truncate=truncate, dim_state = dim_state, l2penalty = l2penalty)
         self.ratiolearner.fit()
         
         
@@ -131,7 +135,7 @@ class evaluator:
         pM_S = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
             pM_Sa = self.pmlearner.get_pm_prediction(state, np.array([a]), mediator)
-            pie_a = self.target_policy(state, a, matrix_based = True)
+            pie_a = self.target_policy(state, self.dim_state, a, matrix_based = True)
             pM_S += pie_a * pM_Sa
             
         pM_SA = self.pmlearner.get_pm_prediction(state, action, mediator)
@@ -140,8 +144,8 @@ class evaluator:
         Er_SAM = self.rewardlearner.get_reward_prediction(state, action, mediator)
         Er_Sa0M = self.rewardlearner.get_reward_prediction(state, np.array([self.a0]), mediator)
         
-        pie_A = self.target_policy(state, action, matrix_based = True)
-        I_A = self.control_policy(state, action, matrix_based = True)
+        pie_A = self.target_policy(state, self.dim_state, action, matrix_based = True)
+        I_A = self.control_policy(state, self.dim_state, action, matrix_based = True)
         termI2 = pM_S / pM_SA * self.ratio_target * (I_A / pie_A) * (reward - Er_SAM)
         print(self.ratio_target.shape, Er_Sa0M.shape, self.Q2_diff.shape, self.eta_piea0.shape)
         termI2 += self.ratio_target * (Er_Sa0M + self.Q2_diff - self.eta_piea0)
@@ -170,8 +174,8 @@ class evaluator:
         #Em_SA = self.pmlearner.get_pm_prediction(self.state, self.action, mediator = None)
         #Er_SA = self.rewardlearner.get_reward_prediction(self.state, self.action, Em_SA)
         
-        pie_A = self.target_policy(state, action, matrix_based = True)
-        I_A = self.control_policy(state, action, matrix_based = True)
+        pie_A = self.target_policy(state, self.dim_state, action, matrix_based = True)
+        I_A = self.control_policy(state, self.dim_state, action, matrix_based = True)
         termI3 = self.ratio_target * (I_A / pie_A) * (reward - Er_SA)
         termI3 += self.ratio_target * (Er_Sa0 + self.Q3_diff - self.eta_piea0star)
         
@@ -188,7 +192,7 @@ class evaluator:
         reward = np.copy(reward).flatten()
         base_DE = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = np.apply_along_axis(self.target_policy, 1, state, action=a).flatten()
+            pie_a = self.target_policy(state, self.dim_state, action = a, matrix_based = True).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
@@ -207,7 +211,7 @@ class evaluator:
         reward = np.copy(reward).flatten()
         base_ME = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = np.apply_along_axis(self.target_policy, 1, state, action=a).flatten()
+            pie_a = self.target_policy(state, self.dim_state, action = a, matrix_based = True).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
