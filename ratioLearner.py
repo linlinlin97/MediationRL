@@ -3,7 +3,7 @@ from numpy.linalg import inv
 from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
-    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, dim_state = 1, l2penalty = 10**(-9)):
+    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, dim_state = 1, l2penalty = 1.0):
         
         self.dim_state = dim_state
         self.state = np.copy(dataset['state']).reshape(-1, self.dim_state)
