@@ -57,36 +57,12 @@ class Simulator:
                 reward = rmean
         return reward
     
-    def toy_sam2nextstate_model(self, state, action, mediator):
+    def toy_sam2nextstate_model(self, state, action, mediator, reward):
         next_state = .5 + 3.0 * state - 2.5 * action - .5 * mediator
         #next_state = .5
         next_state = expit(next_state)
         next_state = np.random.binomial(n=1, p=next_state, size=1)
         return next_state
-#################################################################################3
-# define the environment of the Liao Peng's
-    def liao_init_state(self):
-        init_state0 = np.random.normal(loc=0, scale=1, size=1)
-        init_state1 = np.random.normal(loc=0, scale=1, size=1)
-        init_state2 = np.random.normal(loc=0, scale=1, size=1)
-        return init_state0, init_state1, init_state2
-    
-    def liao_s2action_model(self, random = True):
-        if random:
-            pa = np.random.binomial(n=1, p=0.5, size=1).reshape(-1)
-        return pa
-    
-    def liao_sam2reward_model(self, state0, state1, state2, action, random = True):
-        rmean = 10.0 - 0.4 * state2 + 0.25 * state0 * action * (0.04 + 0.02 * state0 + 0.02 * state1)
-        rmean += 0.16 * np.random.normal(loc=0, scale=1, size=1)
-        return reward
-    
-    def liao_sam2nextstate_model(self, state0, state1, state2, action):#, mediator):
-        next_state0 = 0.5 * state0 + 2 * np.random.normal(loc=0, scale=1, size=1)
-        next_state1 = 0.25 * state1 + 0.125 * action + 2 * np.random.normal(loc=0, scale=1, size=1)
-        next_state2 = 0.9 * state2 + 0.05 * state2 * action + 0.5 * action + np.random.normal(loc=0, scale=1, size=1)
-        return next_state0, next_state1, next_state2
-    
 
 #################################################################################3
 # define the environment of the toy --Gaussian
@@ -137,18 +113,81 @@ class Simulator:
                 reward = rmean
         return reward
     
-    def Gaussian_sam2nextstate_model(self, state, action, mediator):
+    def Gaussian_sam2nextstate_model(self, state, action, mediator, reward):
         next_state = .3 * state +  .3 * mediator + .5 * (action - .5)
         #next_state += .5 * np.random.normal(loc=0, scale=1, size=1)
         next_state += 2 * np.random.normal(loc=0, scale=1, size=1)
         return next_state
+
+#################################################################################3
+# define the environment of the semi-synthetic --Gaussian
+    def semi_init_state(self):
+        init_state = np.random.normal(loc=0, scale=1, size=self.dim_state)
+        return init_state
     
+    def semi_s2action_model(self, state, random):
+        #pa = .1*np.sum(state)
+        #pa = expit(pa)
+        pa = .5
+        if random:
+            pa = np.random.binomial(n=1, p=pa, size=1)
+        else:
+            pa = pa
+        return pa
+    
+    def semi_sa2mediator_model(self, state, action, random):
+        state = state.reshape((-1,self.dim_state))
+        N = state.shape[0]
+        if self.dim_mediator == 2:
+            pm1 = .3 * np.sum(state[:,:-1],axis = 1).reshape((-1,1)) + .8 * (action - .5)
+            pm2 =  -.2 * state[:,-1]
+            pm2 = pm2.reshape((-1,1))
+            pm = np.hstack([pm1, pm2])
+            
+        pm = pm.reshape((N, self.dim_mediator))
+        if random:
+            #pm += np.random.normal(loc=0, scale=1, size=1)
+            pm += .5 * np.random.normal(loc=0, scale=1, size=(N, self.dim_mediator))
+        else:
+            pm = pm
+        return pm
+    
+    def semi_sam2reward_model(self, state, action,mediator, random, matrix_based = False):#, mediator
+        if matrix_based:
+            #print("matrix")
+            if self.dim_mediator == 2:
+                state1 = state.reshape((-1,self.dim_state))
+                mediator1 = mediator.reshape((-1,self.dim_mediator))
+                action1 = action.reshape((-1,1))
+                rmean = .5 * np.sum(state1,axis = 1).reshape((-1,1)) 
+                rmean += .9 * np.sum(mediator1,axis = 1).reshape((-1,1))
+                rmean += .6 * np.sqrt(np.sum(abs(mediator1),axis = 1).reshape((-1,1)) ) * (action1 - .5)
+                #rmean *= 3
+                
+            if random:
+                print("wrong")
+            else:
+                reward = rmean
+        else:
+            if self.dim_mediator == 2:
+                rmean = .5 * np.sum(state) +  .9 * np.sum(mediator) + .6 * np.sqrt(np.sum(abs(mediator))) * (action - .5)
+            #rmean *= 3
+            if random:
+                reward = rmean + 2 * np.random.normal(loc=0, scale=1, size=1)
+            else:
+                reward = rmean
+        return reward
+    
+    def semi_sam2nextstate_model(self, state, action, mediator, reward):
+        next_state = np.hstack([mediator,np.array(reward)])
+        return next_state
 ######################################################################
 # Initiate the simulator
 
-    def __init__(self, model_type='toy', dim_state=3):
+    def __init__(self, model_type='toy', dim_state=1, dim_mediator = 1):
         #i.e., if only one component of state, then dim_state=1
         self.dim_state = dim_state
+        self.dim_mediator = dim_mediator
         if model_type == "toy":
             self.model_type = "toy"
             self.init_state_model = self.toy_init_state
@@ -156,19 +195,26 @@ class Simulator:
             self.sa2mediator_model = self.toy_sa2mediator_model
             self.sam2reward_model = self.toy_sam2reward_model
             self.sam2nextstate_model = self.toy_sam2nextstate_model
-        if model_type == "Liao":
+        elif model_type == "Liao":
             self.model_type = "Liao"
             self.init_state_model = self.liao_init_state
             self.s2action_model = self.liao_s2action_model
             self.sam2reward_model = self.liao_sam2reward_model
             self.sam2nextstate_model = self.liao_sam2nextstate_model
-        if model_type == "Gaussian_toy":
+        elif model_type == "Gaussian_toy":
             self.model_type = "Gaussian_toy"
             self.init_state_model = self.Gaussian_init_state
             self.s2action_model = self.Gaussian_s2action_model
             self.sa2mediator_model = self.Gaussian_sa2mediator_model
             self.sam2reward_model = self.Gaussian_sam2reward_model
             self.sam2nextstate_model = self.Gaussian_sam2nextstate_model
+        elif model_type == "Gaussian_semi":
+            self.model_type = "Gaussian_semi"
+            self.init_state_model = self.semi_init_state
+            self.s2action_model = self.semi_s2action_model
+            self.sa2mediator_model = self.semi_sa2mediator_model
+            self.sam2reward_model = self.semi_sam2reward_model
+            self.sam2nextstate_model = self.semi_sam2nextstate_model
             
             
         self.trajectory_list = []
@@ -204,9 +250,9 @@ class Simulator:
         random_reward = self.sam2reward_model(state, action, mediator, random=random, matrix_based = matrix_based)
         return random_reward
 
-    def sample_sam2nextstate(self, state, action, mediator):
+    def sample_sam2nextstate(self, state, action, mediator, reward):
         random_next_state = self.sam2nextstate_model(
-            state, action, mediator)
+            state, action, mediator, reward)
         return random_next_state
     
 ######################################################################
@@ -223,7 +269,10 @@ class Simulator:
         init_state = self.sample_init_state()
         random_state = np.zeros((num_time+1, self.dim_state))
         random_action = np.zeros(num_time)
-        random_mediator = np.zeros(num_time)
+        if self.dim_mediator > 1:
+            random_mediator = np.zeros((num_time, self.dim_mediator))
+        else:
+            random_mediator = np.zeros(num_time)
         random_reward = np.zeros(num_time)
 
         random_state[0] = init_state.reshape(-1)
@@ -235,7 +284,7 @@ class Simulator:
             random_reward[i] = self.sample_sam2reward(
                 random_state[i], random_action[i], random_mediator[i])
             random_state[i+1] = self.sample_sam2nextstate(
-                random_state[i], random_action[i], random_mediator[i])
+                random_state[i], random_action[i], random_mediator[i], random_reward[i])
             pass
         
         if burn_in:
@@ -275,18 +324,21 @@ class Simulator:
         init_state = self.sample_init_state()
         random_state = np.zeros((num_time+1, self.dim_state))
         random_action = np.zeros(num_time)
-        random_mediator = np.zeros(num_time)
+        if self.dim_mediator > 1:
+            random_mediator = np.zeros((num_time, self.dim_mediator))
+        else:
+            random_mediator = np.zeros(num_time)
         random_reward = np.zeros(num_time)
 
         random_state[0] = init_state.reshape(-1)
         for i in range(num_time):
-            random_action[i] = target_policy(random_state[i])
+            random_action[i] = target_policy(state = random_state[i], dim_state = self.dim_state)
             random_mediator[i] = self.sample_sa2mediator(
                 random_state[i], random_action[i])
             random_reward[i] = self.sample_sam2reward(
                 random_state[i], random_action[i], random_mediator[i])
             random_state[i+1] = self.sample_sam2nextstate(
-                random_state[i], random_action[i], random_mediator[i])
+                random_state[i], random_action[i], random_mediator[i], random_reward[i])
             pass
         
         if burn_in:
@@ -354,10 +406,10 @@ class Simulator:
                 s0_dataset = s0_data
             else:
                 s0_dataset = np.vstack([s0_dataset, s0_data])
-                iid_dataset[0] = np.vstack([iid_dataset[0], iid_data[0]]) #state 2-d
-                iid_dataset[4] = np.vstack([iid_dataset[4], iid_data[4]]) #nextstate 2-d
+                iid_dataset[0] = np.vstack([iid_dataset[0], iid_data[0]]) #state 3-d
+                iid_dataset[4] = np.vstack([iid_dataset[4], iid_data[4]]) #nextstate 3-d
                 iid_dataset[1] = np.append(iid_dataset[1], iid_data[1]) #action 1-d
-                iid_dataset[2] = np.append(iid_dataset[2], iid_data[2]) #mediator 1-d
+                iid_dataset[2] = np.vstack([iid_dataset[2], iid_data[2]]) #mediator 2-d
                 iid_dataset[3] = np.append(iid_dataset[3], iid_data[3]) #reward 1-d
                 pass
             pass
