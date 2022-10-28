@@ -11,10 +11,12 @@ class evaluator:
                  QLearner, PMLearner, 
                  RewardLearner, PALearner, RatioLearner,
                  problearner_parameters = {"splitter":["best","random"], "max_depth" : range(1,20)},
-                 ratio_ndim = 5, truncate = 20, l2penalty = 10**(-9),
-                 target_policy=None, control_policy = None, dim_state = 1,
-                 dim_mediator = 1, scaler = 'Identity', 
-                 expectation_MCMC_iter = 100,  expectation_MCMC_iter_Q3 = 100, expectation_MCMC_iter_Q_diff = 100,
+                 ratio_ndim = 5, truncate = 20, l2penalty = 1.0,
+                 target_policy=None, control_policy = None, dim_state = 1, dim_mediator = 1, 
+                 Q_settings = {'scaler': 'Identity','product_tensor': True, 'beta': 3/7, 'include_intercept': False,
+                               'expectation_MCMC_iter_Q3': 100, 'expectation_MCMC_iter_Q_diff':100, 'penalty': 10**(-9),
+                              'd': 3, 'min_L': 7},
+                 expectation_MCMC_iter = 100,
                  seed = 0):
         '''
         
@@ -52,7 +54,7 @@ class evaluator:
         self.dataset = dataset
         self.dim_state = dim_state
         self.dim_mediator = dim_mediator
-        self.scaler = scaler
+        self.truncate = truncate
         
         self.target_policy = target_policy
         #control_policy
@@ -60,8 +62,6 @@ class evaluator:
         self.a0 = control_policy(get_a = True)
         
         self.expectation_MCMC_iter = expectation_MCMC_iter
-        self.expectation_MCMC_iter_Q3 = expectation_MCMC_iter_Q3
-        self.expectation_MCMC_iter_Q_diff = expectation_MCMC_iter_Q_diff
         
         self.qlearner = QLearner
         self.pmlearner = PMLearner(dataset, problearner_parameters, seed, dim_state = dim_state,
@@ -77,22 +77,35 @@ class evaluator:
                                          truncate=truncate, dim_state = dim_state, l2penalty = l2penalty)
         self.ratiolearner.fit()
         
-        
         self.unique_action = np.unique(self.action)
         self.unique_mediator = np.unique(self.mediator)
         self.est_DEMESE = None
+        
+        self.Q_settings = Q_settings
+        
         pass
     
     def estimate_DE_ME_SE(self):
         data_num = self.state.shape[0]
         self.ind_est = np.array([range(data_num)] * 8, dtype=float)
-        Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner, self.ratiolearner, self.palearner, self.unique_action, self.dim_state, self.dim_mediator, self.scaler, self.expectation_MCMC_iter_Q3, self.expectation_MCMC_iter_Q_diff, self.seed)
-    
-        self.Q1_diff, self.eta_pie, self.Q2_diff, self.eta_piea0, self.Q3_diff, self.eta_piea0star, self.Q4_diff, self.eta_a0, self.ratio_target, self.ratio_control = Q_est.Q1_diff, Q_est.eta_pie, Q_est.Q2_diff, Q_est.eta_piea0, Q_est.Q3_diff, Q_est.eta_piea0star, Q_est.Q4_diff, Q_est.eta_a0, Q_est.ratio_target, Q_est.ratio_control
+        Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner, self.ratiolearner, self.palearner, self.unique_action, self.dim_state, self.dim_mediator, self.Q_settings, self.seed)
+        Q_est.est_Q1()
+        Q_est.est_Q2()
+        Q_est.est_Q3()
+        Q_est.est_Q4()
+        Q_est.est_ratio()
+        self.Q1_diff, self.eta_pie = Q_est.Q1_diff, Q_est.eta_pie
+        self.Q2_diff, self.eta_piea0 = Q_est.Q2_diff, Q_est.eta_piea0
+        self.Q3_diff, self.eta_piea0star = Q_est.Q3_diff, Q_est.eta_piea0star
+        self.Q4_diff, self.eta_a0 = Q_est.Q4_diff, Q_est.eta_a0
+        self.ratio_target, self.ratio_control = Q_est.ratio_target, Q_est.ratio_control
         self.time_rec = Q_est.time_rec
-        self.Q1_est_beta, self.Q2_est_beta, self.Q3_est_beta, self.Q4_est_beta = Q_est.Q1_est_beta, Q_est.Q2_est_beta, Q_est.Q3_est_beta, Q_est.Q4_est_beta
+        self.Q1_est_beta = Q_est.Q1_est_beta
+        self.Q2_est_beta = Q_est.Q2_est_beta
+        self.Q3_est_beta = Q_est.Q3_est_beta
+        self.Q4_est_beta = Q_est.Q4_est_beta
         self.bspline = Q_est.bspline
-        self.para_dim = Q_est.para_dim
+        self.para_dim = Q_est.para_dim 
         
         
         intercept_DE = self.eta_pie - self.eta_piea0
@@ -146,8 +159,9 @@ class evaluator:
         
         pie_A = self.target_policy(state, self.dim_state, action, matrix_based = True)
         I_A = self.control_policy(state, self.dim_state, action, matrix_based = True)
-        termI2 = pM_S / pM_SA * self.ratio_target * (I_A / pie_A) * (reward - Er_SAM)
-        print(self.ratio_target.shape, Er_Sa0M.shape, self.Q2_diff.shape, self.eta_piea0.shape)
+        #termI2 = pM_S / pM_SA * self.ratio_target * (I_A / pie_A) * (reward - Er_SAM)
+        termI2 = np.clip(pM_S / pM_SA, a_min=None, a_max=self.truncate)* self.ratio_target * (I_A / pie_A) * (reward - Er_SAM)
+        #print(self.ratio_target.shape, Er_Sa0M.shape, self.Q2_diff.shape, self.eta_piea0.shape)
         termI2 += self.ratio_target * (Er_Sa0M + self.Q2_diff - self.eta_piea0)
         
         return termI2

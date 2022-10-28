@@ -55,7 +55,7 @@ class PMLearner():
             regressor[i] = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor[i].fit(X=X, y=y[:,i])
             best_params[i] = regressor[i].best_params_
-            print('mediator'+str(i),best_params[i])
+            #print('mediator'+str(i),best_params[i])
             tree_model[i] = DecisionTreeRegressor(random_state=self.seed, max_depth = best_params[i]['max_depth'], splitter = best_params[i]['splitter'])
             tree_model[i].fit(X, y[:,i])
             y_Xb = y[:,i].reshape((X.shape[0], -1)) - tree_model[i].predict(X).reshape((X.shape[0], -1))
@@ -183,7 +183,7 @@ class RewardLearner():
             regressor = GridSearchCV(DecisionTreeRegressor(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
-            print('reward', best_params)
+            #print('reward', best_params)
 
             self.tree_model = DecisionTreeRegressor(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
             self.tree_model.fit(X, y)
@@ -256,7 +256,7 @@ class PALearner():
             regressor = GridSearchCV(DecisionTreeClassifier(random_state=self.seed), self.parameters, n_jobs=-1)
             regressor.fit(X=X, y=y)
             best_params = regressor.best_params_
-            print('action', best_params)
+            #print('action', best_params)
             self.tree_model = DecisionTreeClassifier(random_state=self.seed, max_depth = best_params['max_depth'], splitter = best_params['splitter'])
             self.tree_model.fit(X, y)
             self.prob_A = self.tree_model.predict_proba(X)
