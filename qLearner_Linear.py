@@ -73,7 +73,7 @@ class Qlearner():
         #Q3 
         Er_Sa0m = np.zeros(self.NT, dtype=float)
         for rep in range(self.expectation_MCMC_iter_Q3):
-            np.random.seed(rep)
+            #np.random.seed(rep)
             m_Sa0 = self.pmlearner.sample_m(self.state, self.a0, random = True)
             r_Sa0m = self.rewardlearner.get_reward_prediction(self.state, self.a0, m_Sa0)
             Er_Sa0m = self.update_exp(rep, Er_Sa0m, r_Sa0m.reshape((-1,)))
@@ -175,7 +175,7 @@ class Qlearner():
             if pa > 0:
                 sample_phi = []
                 for rep in range(self.expectation_MCMC_iter_Q3):
-                    np.random.seed(rep)
+                    #np.random.seed(rep)
                     m = self.pmlearner.sample_m(state = S_next, action = np.array([a]), random = True)
                     m = m.reshape((self.dim_mediator,))
                     sample_phi.append(self._U(S_next, m, a)[:-1])
@@ -239,7 +239,7 @@ class Qlearner():
         #MCMC to get the mean over m
         Q1_SAm, Q2_SAm, Q3_SAm, Q4_SAm = self.init_Qs()
         for rep in range(self.expectation_MCMC_iter_Q_diff):
-            np.random.seed(rep)
+            #np.random.seed(rep)
             m_SA = self.pmlearner.sample_m(state, action, random = True)
             out_Q1,out_Q2,out_Q3,out_Q4 = self.cal_newQ(state, m_SA, action)
             Q1_SAm = self.update_exp(rep, Q1_SAm, out_Q1)
@@ -253,7 +253,7 @@ class Qlearner():
             pi0_a = self.control_policy(next_state, self.dim_state, a, matrix_based = True)
             Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC = self.init_Qs()
             for rep in range(self.expectation_MCMC_iter_Q_diff):
-                np.random.seed(rep)
+                #np.random.seed(rep)
                 m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
                 action_list = [a]*self.NT
                 out_Q1, out_Q2, out_Q3, out_Q4 = self.cal_newQ(next_state, m_Snext_a, action_list)
