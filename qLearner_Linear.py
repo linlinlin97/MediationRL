@@ -3,6 +3,7 @@ from itertools import product
 from scipy.interpolate import BSpline
 from scipy.stats import norm
 from numpy.linalg import inv
+from _util import *
 
 class normcdf():
     def transform(self, S):
@@ -86,18 +87,6 @@ class Qlearner():
     
     def est_Qdiffs(self):
         self.Q1_diff, self.Q2_diff, self.Q3_diff, self.Q4_diff = self._Q_diff(self.state, self.mediator, self.action, self.next_state)
-        
-    def est_ratio(self):    
-        pie_A = self.target_policy(self.state, self.dim_state, self.action, matrix_based = True)
-        I_A = self.control_policy(self.state, self.dim_state, self.action, matrix_based = True)
-        pieb_A = self.palearner.get_pa_prediction(self.state, self.action)
-        w_pie = self.ratiolearner.get_r_prediction(self.state, policy = 'target', normalize=True)
-        w_a0 = self.ratiolearner.get_r_prediction(self.state, policy = 'control', normalize=True)
-        self.ratio_control = w_a0*I_A/pieb_A
-        self.ratio_target = w_pie*pie_A/pieb_A
-        #time_learn_ratio = time.time() - t0
-        
-        self.time_rec = {'time_learn_Q': np.nan, 'time_learn_ratio': np.nan}
         
     def est_beta_eta(self, Y_all, U, Sigma_hat):
         est_beta = self._beta_hat(Y_all, U, Sigma_hat)
