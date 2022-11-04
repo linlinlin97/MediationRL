@@ -1,23 +1,8 @@
 import numpy as np
-from multiprocessing import Pool
-from itertools import product
-from tqdm import tqdm
-import pickle
-from scipy.special import expit
-import numpy as np  
-import matplotlib.pyplot as plt 
-import pandas as pd  
-import sklearn
-
-from sklearn.tree import DecisionTreeRegressor  
-from sklearn.model_selection import cross_val_score  
-from sklearn.metrics import mean_squared_error
-
+from itertools import product  
 from scipy.interpolate import BSpline
 from scipy.stats import norm
-
 from numpy.linalg import inv
-import time
 
 class normcdf():
     def transform(self, S):
@@ -35,11 +20,16 @@ class Qlearner():
         np.random.seed(seed)
         
         self.unique_action = unique_action
-        self.nums_action = len(unique_action)
-        self.data = data
+        self.state = data['state']
+        self.mediator = data['mediator']
+        self.action = data['action']
+        self.R = data['reward']
+        self.next_state = data['next_state']
+        self.tuples = self.get_tuples(data)
+        
         self.dim_state = dim_state
         self.dim_mediator = dim_mediator 
-        self.NT = len(self.data['action'])
+        self.NT = len(self.action)
         self.beta = Q_settings['beta']
         self.product_tensor = Q_settings['product_tensor']
         self.include_intercept = Q_settings['include_intercept']
@@ -60,66 +50,47 @@ class Qlearner():
         self.expectation_MCMC_iter_Q_diff = Q_settings['expectation_MCMC_iter_Q_diff']
         self.l2penalty = Q_settings['penalty']
         
-        self.state = self.data['state']
-        self.mediator = self.data['mediator']
-        self.action = self.data['action']
-        self.R = self.data['reward']
-        self.next_state = self.data['next_state']
-        
         self.target_policy = target_policy
         #control_policy
         self.control_policy = control_policy
         self.a0 = control_policy(get_a = True)
         
-        self.tuples = self.get_tuples_curr_next(self.data)
+        self.U = self._U4all(self.tuples)
+        self.Sigma_control = self._Sigma(self.tuples, control_policy, self.U)
+        self.Sigma_target = self._Sigma(self.tuples, target_policy, self.U)
         
     def est_Q1(self):
         #Q1
         #t0 = time.time()
-        self.eta_pie, self.Q1_diff, self.Q1_est_beta = self.Q_diff_eta(self.tuples, self.R, self.target_policy)
+        self.eta_pie, self.Q1_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_target)
         
     def est_Q2(self):
         #Q2
         Er_Sa0M = self.rewardlearner.get_reward_prediction(self.state, self.a0, self.mediator)
-        self.eta_piea0, self.Q2_diff, self.Q2_est_beta = self.Q_diff_eta(self.tuples, Er_Sa0M, self.target_policy)
+        self.eta_piea0, self.Q2_est_beta = self.est_beta_eta(Er_Sa0M, self.U, self.Sigma_target)
         
     def est_Q3(self):
         #Q3 
-        Er_Sa0m = []
+        Er_Sa0m = np.zeros(self.NT, dtype=float)
         for rep in range(self.expectation_MCMC_iter_Q3):
+            np.random.seed(rep)
             m_Sa0 = self.pmlearner.sample_m(self.state, self.a0, random = True)
             r_Sa0m = self.rewardlearner.get_reward_prediction(self.state, self.a0, m_Sa0)
-            Er_Sa0m.append(r_Sa0m)
-        Er_Sa0m = np.mean(Er_Sa0m,0)
-        self.eta_piea0star, self.Q3_diff, self.Q3_est_beta = self.Q_diff_eta(self.tuples, Er_Sa0m, self.target_policy)
+            Er_Sa0m = self.update_exp(rep, Er_Sa0m, r_Sa0m.reshape((-1,)))
+        self.eta_piea0star, self.Q3_est_beta = self.est_beta_eta(Er_Sa0m, self.U, self.Sigma_target)
         
     def est_Q4(self):
         #Q4
-        self.eta_a0, self.Q4_diff, self.Q4_est_beta = self.Q_diff_eta( self.tuples, self.R, self.control_policy)
+        self.eta_a0, self.Q4_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_control)
         #time_leanr_Q = time.time() - t0
     
-    def est_ratio(self):
-        #ratio
-        #t0 = time.time()
-        #with open('best_kde_behavior_type2.txt',"rb") as fp:
-        #    stationary_behavior_policy_state_density = pickle.load(fp)
-        #with open('best_kde_target_type2.txt',"rb") as fp:
-        #    stationary_target_policy_state_density = pickle.load(fp)    
-        #with open('best_kde_control_type2.txt',"rb") as fp:
-        #    stationary_fixed_policy_state_density = pickle.load(fp)    
-     
-        self.action = self.data['action']
+    def est_Qdiffs(self):
+        self.Q1_diff, self.Q2_diff, self.Q3_diff, self.Q4_diff = self._Q_diff(self.state, self.mediator, self.action, self.next_state)
+        
+    def est_ratio(self):    
         pie_A = self.target_policy(self.state, self.dim_state, self.action, matrix_based = True)
         I_A = self.control_policy(self.state, self.dim_state, self.action, matrix_based = True)
         pieb_A = self.palearner.get_pa_prediction(self.state, self.action)
-        #numerator_pie = np.exp(stationary_target_policy_state_density.score_samples(self.state.reshape(-1, 1)))
-        #numerator_a0 = np.exp(stationary_fixed_policy_state_density.score_samples(self.state.reshape(-1, 1)))
-        #denominator = np.exp(stationary_behavior_policy_state_density.score_samples(self.state.reshape(-1, 1)))
-        #numerator_pie = np.clip(numerator_pie, a_min = 1e-4, a_max = .9999)
-        #numerator_a0 = np.clip(numerator_a0, a_min = 1e-4, a_max = .9999)
-        #denominator = np.clip(denominator, a_min = 1e-4, a_max = .9999)
-        #w_pie = numerator_pie/denominator
-        #w_a0 = numerator_a0/denominator
         w_pie = self.ratiolearner.get_r_prediction(self.state, policy = 'target', normalize=True)
         w_a0 = self.ratiolearner.get_r_prediction(self.state, policy = 'control', normalize=True)
         self.ratio_control = w_a0*I_A/pieb_A
@@ -128,16 +99,16 @@ class Qlearner():
         
         self.time_rec = {'time_learn_Q': np.nan, 'time_learn_ratio': np.nan}
         
-    def Q_diff_eta(self, tuples, Y_all, policy):
-        est_beta = self._beta_hat(tuples, Y_all, policy)
+    def est_beta_eta(self, Y_all, U, Sigma_hat):
+        est_beta = self._beta_hat(Y_all, U, Sigma_hat)
         eta = self.eta_hat(est_beta)
-        Q_diff = self.est_Q_diff(self.state, self.mediator, self.action, self.next_state, est_beta, policy)
-        return eta, Q_diff, est_beta
+        #Q_diff = self.est_Q_diff(self.state, self.mediator, self.action, self.next_state, est_beta, policy)
+        return eta, est_beta
         
     def B_spline(self, L = 3, d = 1):
-        tuples = np.array(self.get_tuples(self.data))
+        tuples_array = np.array(self.tuples)
         state_mediator_col = list(np.arange(self.dim_state)) + list(np.arange(self.dim_state+1,self.dim_state+1+self.dim_mediator)) 
-        scale_data = self.scaler.transform(tuples[:,state_mediator_col])
+        scale_data = self.scaler.transform(tuples_array[:,state_mediator_col])
         knot = np.quantile(scale_data, np.linspace(0,1,L + 1), axis=0) # to avoid the bounded issue
         self.bspline = []
         n_const = 1 - int(self.include_intercept)
@@ -175,7 +146,6 @@ class Qlearner():
         return tuples
 
 
-
     def _U(self, S, M, A, include_eta = False):
         x = np.hstack([S, M])
         x = self.scaler.transform(x)
@@ -205,6 +175,7 @@ class Qlearner():
             if pa > 0:
                 sample_phi = []
                 for rep in range(self.expectation_MCMC_iter_Q3):
+                    np.random.seed(rep)
                     m = self.pmlearner.sample_m(state = S_next, action = np.array([a]), random = True)
                     m = m.reshape((self.dim_mediator,))
                     sample_phi.append(self._U(S_next, m, a)[:-1])
@@ -218,30 +189,34 @@ class Qlearner():
             phi = list(phi) + [0]
         #print('_Xi:', np.array(phi).reshape(-1,1))
         return np.array(phi).reshape(-1,1)
-
-    def _Sigma(self, tuples, Y_all, policy):
-        #output = np.zeros((self.para_dim * self.nums_action + 1, self.para_dim * self.nums_action + 1))
-        #output_2 = np.zeros((self.para_dim * self.nums_action + 1, 1))
-        output = [np.matmul(self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True),
-                                 (self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True) - 
-                                  self._Xi(tuple_i[4], policy, include_eta = False)).T) for tuple_i in tuples]
-        output_2 = [Y_all[i] * self._U(tuples[i][0], tuples[i][2], tuples[i][1], include_eta = True) for i in range(len(tuples))]
+    
+    def _U4all(self, tuples):
+        U = [self._U(tuple_i[:self.dim_state], tuple_i[self.dim_state+1:self.dim_state+self.dim_mediator+1],
+                                    tuple_i[self.dim_state], include_eta = True) for tuple_i in tuples]
+        return U
+    
+    def _Sigma(self, tuples, policy, U):
+        output = [np.matmul(U[i],
+                            (U[i] - self._Xi(np.array(tuples[i][-self.dim_state:]), policy, include_eta = False)).T) for i in range(len(tuples))]
         output = np.mean(output,axis=0)
-        output_2 = np.mean(output_2,axis=0)
-        #print('output:', output)
-        #print('output_2:', output_2)
+        #output = [np.matmul(self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True),
+        #                         (self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True) - 
+        #                          self._Xi(tuple_i[4], policy, include_eta = False)).T) for tuple_i in tuples]
         """
         Add ridge can avoid overfitting!
         """
         Sigma_hat =  np.diag([self.l2penalty] * output.shape[0])  +  output
+        return Sigma_hat
+    
+    def _UY(self, Y_all, U):
+        output_2 = [Y_all[i] * U[i] for i in range(len(U))]
+        output_2 = np.mean(output_2,axis=0)
         vector = output_2
-        self.tuples = tuples
-        self.Y_all = Y_all
-        self.outpolicy=  policy
-        return Sigma_hat, vector
+        #output_2 = [Y_all[i] * self._U(tuples[i][0], tuples[i][2], tuples[i][1], include_eta = True) for i in range(len(tuples))]
+        return vector
 
-    def _beta_hat(self, tuples, Y_all, policy):
-        Sigma_hat, vector = self._Sigma(tuples, Y_all, policy)
+    def _beta_hat(self, Y_all, U, Sigma_hat):
+        vector = self._UY(Y_all, U)
         #print(Sigma_hat)
         inv_Sigma_hat = inv(Sigma_hat)
         est_beta = np.matmul(inv_Sigma_hat, vector)
@@ -251,30 +226,67 @@ class Qlearner():
     def eta_hat(self, est_beta):
         return est_beta[-1]
 
-    def Q(self, S, M, A, est_beta):
+    def Q(self, S, M, A):
         output = self._U(S, M, A)[:-1]
-        return np.dot(output.reshape((1,-1)), est_beta[:-1].reshape((-1,)))
+        Q1 = np.dot(output.reshape((1,-1)), self.Q1_est_beta[:-1].reshape((-1,)))
+        Q2 = np.dot(output.reshape((1,-1)), self.Q2_est_beta[:-1].reshape((-1,)))
+        Q3 = np.dot(output.reshape((1,-1)), self.Q3_est_beta[:-1].reshape((-1,)))
+        Q4 = np.dot(output.reshape((1,-1)), self.Q4_est_beta[:-1].reshape((-1,)))
+        return Q1, Q2, Q3, Q4
         #return sum(map(operator.mul, output, est_beta[:-1]))
 
-    def est_Q_diff(self, state, mediator, action, next_state, est_beta, policy):
-        Q_Snext_am = np.zeros(len(action), dtype=float)
+    def _Q_diff(self, state, mediator, action, next_state):
         #MCMC to get the mean over m
-        Q_SAm = []
+        Q1_SAm, Q2_SAm, Q3_SAm, Q4_SAm = self.init_Qs()
         for rep in range(self.expectation_MCMC_iter_Q_diff):
+            np.random.seed(rep)
             m_SA = self.pmlearner.sample_m(state, action, random = True)
-            out_Q = [self.Q(state[i], m_SA[i], action[i], est_beta) for i in range(len(action))]
-            Q_SAm.append(out_Q)
+            out_Q1,out_Q2,out_Q3,out_Q4 = self.cal_newQ(state, m_SA, action)
+            Q1_SAm = self.update_exp(rep, Q1_SAm, out_Q1)
+            Q2_SAm = self.update_exp(rep, Q2_SAm, out_Q2)
+            Q3_SAm = self.update_exp(rep, Q3_SAm, out_Q3)
+            Q4_SAm = self.update_exp(rep, Q4_SAm, out_Q4)
+        
+        Q1_Snext_am, Q2_Snext_am, Q3_Snext_am, Q4_Snext_am = self.init_Qs()
         for a in self.unique_action:
-            pie_a = policy(next_state, self.dim_state, a, matrix_based = True)
-            Q_Snext_am_MC = []
+            pie_a = self.target_policy(next_state, self.dim_state, a, matrix_based = True)
+            pi0_a = self.control_policy(next_state, self.dim_state, a, matrix_based = True)
+            Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC = self.init_Qs()
             for rep in range(self.expectation_MCMC_iter_Q_diff):
+                np.random.seed(rep)
                 m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
-                out_Q = [self.Q(next_state[i], m_Snext_a[i], a, est_beta) for i in range(len(action))]
-                Q_Snext_am_MC.append(out_Q)
-            Q_Snext_am += pie_a * np.mean(Q_Snext_am_MC,0).reshape((-1,))
-        return Q_Snext_am - np.mean(Q_SAm,0).reshape((-1,))
-
-    def get_tuples_curr_next(self, data):
-        tuples = [[data['state'][nt], data['action'][nt], data['mediator'][nt], data['reward'][nt], data['next_state'][nt]] 
-                  for nt in range(self.NT)]
-        return tuples
+                action_list = [a]*self.NT
+                out_Q1, out_Q2, out_Q3, out_Q4 = self.cal_newQ(next_state, m_Snext_a, action_list)
+                Q1_Snext_am_MC = self.update_exp(rep, Q1_Snext_am_MC, out_Q1)
+                Q2_Snext_am_MC = self.update_exp(rep, Q2_Snext_am_MC, out_Q2)
+                Q3_Snext_am_MC = self.update_exp(rep, Q3_Snext_am_MC, out_Q3)
+                Q4_Snext_am_MC = self.update_exp(rep, Q4_Snext_am_MC, out_Q4)
+            Q1_Snext_am += pie_a * Q1_Snext_am_MC.reshape((-1,))
+            Q2_Snext_am += pie_a * Q2_Snext_am_MC.reshape((-1,))
+            Q3_Snext_am += pie_a * Q3_Snext_am_MC.reshape((-1,))
+            Q4_Snext_am += pi0_a * Q4_Snext_am_MC.reshape((-1,))
+        
+        Q1_diff = Q1_Snext_am - Q1_SAm.reshape((-1,))
+        Q2_diff = Q2_Snext_am - Q2_SAm.reshape((-1,))
+        Q3_diff = Q3_Snext_am - Q3_SAm.reshape((-1,))
+        Q4_diff = Q4_Snext_am - Q4_SAm.reshape((-1,))
+        return Q1_diff, Q2_diff, Q3_diff, Q4_diff
+    
+    
+    def init_Qs(self):
+        return np.zeros(self.NT, dtype=float),np.zeros(self.NT, dtype=float),np.zeros(self.NT, dtype=float),np.zeros(self.NT, dtype=float)
+    
+    def update_exp(self, rep, old_est, new_obs):
+        return (rep*old_est + new_obs)/(rep+1)
+    
+    def cal_newQ(self, s,m,a):
+        Qs = [self.Q(s[i], m[i], a[i]) for i in range(self.NT)]
+        Q1 = np.array([q[0] for q in Qs]).reshape((-1,))
+        Q2 = np.array([q[1] for q in Qs]).reshape((-1,))
+        Q3 = np.array([q[2] for q in Qs]).reshape((-1,))
+        Q4 = np.array([q[3] for q in Qs]).reshape((-1,))
+        return Q1, Q2, Q3, Q4
+    #def get_tuples_curr_next(self, data):
+    #    tuples = [[data['state'][nt], data['action'][nt], data['mediator'][nt], data['reward'][nt], data['next_state'][nt]] 
+    #              for nt in range(self.NT)]
+    #    return tuples
