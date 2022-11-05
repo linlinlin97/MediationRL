@@ -91,9 +91,9 @@ class RatioLinearLearner:
         ratio_min = 1 / self.truncate
         ratio_max = self.truncate
         ratio = np.clip(ratio, a_min=ratio_min, a_max=ratio_max)
-        #if state.shape[0] > 1:
-        #    if normalize:
-         #       ratio /= np.mean(ratio)
+        if state.shape[0] > 1:
+            if normalize:
+                ratio /= np.mean(ratio)
         return ratio
 
     def get_r_prediction(self, state, policy = 'target', normalize=True):
