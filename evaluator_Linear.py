@@ -13,7 +13,8 @@ class evaluator:
                  RewardLearner, PALearner, RatioLearner,
                  problearner_parameters = {"splitter":["best","random"], "max_depth" : range(1,20)},
                  ratio_ndim = 5, truncate = 20, l2penalty = 1.0,
-                 target_policy=None, control_policy = None, dim_state = 1, dim_mediator = 1, 
+                 t_depend_target = False, target_policy=None, control_policy = None, 
+                 dim_state = 1, dim_mediator = 1, 
                  Q_settings = {'scaler': 'Identity','product_tensor': True, 'beta': 3/7, 'include_intercept': False,
                                'expectation_MCMC_iter_Q3': 100, 'expectation_MCMC_iter_Q_diff':100, 'penalty': 10**(-9),
                               'd': 3, 'min_L': 7},
@@ -50,6 +51,7 @@ class evaluator:
         self.mediator = np.copy(dataset['mediator'])
         self.reward = np.copy(dataset['reward'])
         self.next_state = np.copy(dataset['next_state'])
+        self.time_idx = np.copy(dataset['time_idx'])
         self.s0 = np.copy(dataset['s0'])
         
         self.dataset = dataset
@@ -58,6 +60,7 @@ class evaluator:
         self.truncate = truncate
         
         self.target_policy = target_policy
+        self.t_depend_target = t_depend_target
         #control_policy
         self.control_policy = control_policy
         self.a0 = control_policy(get_a = True)
@@ -69,58 +72,50 @@ class evaluator:
         self.pmlearner = PMLearner(dataset, problearner_parameters, seed, dim_state = dim_state,
                                    dim_mediator = dim_mediator)
         self.pmlearner.train()
-        t_m = process_time() - t0
-        t0 = process_time()
+
         self.rewardlearner = RewardLearner(dataset, problearner_parameters, seed, dim_state = dim_state,
                                            dim_mediator = dim_mediator)
         self.rewardlearner.train()
-        t_r= process_time() - t0
-        t0 = process_time()
+
         self.palearner = PALearner(dataset, problearner_parameters, seed, test = False, dim_state = dim_state,
                                    dim_mediator = dim_mediator)
         self.palearner.train()
-        t_a = process_time() - t0
-        t0 = process_time()
-        self.ratiolearner = RatioLearner(dataset, target_policy, control_policy, self.palearner, ndim=ratio_ndim,
-                                         truncate=truncate, dim_state = dim_state, l2penalty = l2penalty)
+
+        self.ratiolearner = RatioLearner(dataset, target_policy, control_policy, self.palearner, 
+                                         ndim=ratio_ndim, truncate=truncate, dim_state = dim_state,
+                                         l2penalty = l2penalty, t_depend_target = t_depend_target)
         self.ratiolearner.fit()
         self.w_pie = self.ratiolearner.get_r_prediction(self.state, policy = 'target', normalize=True)
         self.w_a0 = self.ratiolearner.get_r_prediction(self.state, policy = 'control', normalize=True)
-        self.pie_A = self.target_policy(self.state, self.dim_state, self.action)
+        if self.t_depend_target:
+            self.pie_A = self.target_policy(self.state, self.dim_state, action = self.action, time_idx = self.time_idx)
+        else:
+            self.pie_A = self.target_policy(self.state, self.dim_state, action = self.action)
         self.I_A = self.control_policy(self.state, self.dim_state, self.action)
         self.pieb_A = self.palearner.get_pa_prediction(self.state, self.action)
-        t_ratio = process_time() - t0
-        t0 = process_time()
+        
+        if np.sum(self.pie_A) != np.sum(self.ratiolearner.target_pa) or np.sum(self.I_A) != np.sum(self.ratiolearner.control_pa) or np.sum(self.pieb_A) != np.sum(self.ratiolearner.estimate_pa):
+            raise ValueError('Inconsistent pa estimation.')
+            
         self.unique_action = np.unique(self.action)
         self.unique_mediator = np.unique(self.mediator)
         self.est_DEMESE = None
         
         self.Q_settings = Q_settings
-        self.time_rec = {'t_m':t_m,'t_r':t_r,'t_a':t_a,'t_ratio':t_ratio}
-        
+
         pass
     
     def estimate_DE_ME_SE(self):
         data_num = self.state.shape[0]
         self.ind_est = np.array([range(data_num)] * 8, dtype=float)
-        t0 = process_time()
-        Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner, self.ratiolearner, self.palearner, self.unique_action, self.dim_state, self.dim_mediator, self.Q_settings, self.seed)
-        self.time_rec['t_Q0'] = process_time() - t0
-        t0 = process_time()
+        Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner,
+                              self.ratiolearner, self.palearner, self.unique_action, self.dim_state, self.dim_mediator, 
+                              self.Q_settings, self.seed, self.t_depend_target)
         Q_est.est_Q1()
-        self.time_rec['t_Q1'] = process_time() - t0
-        t0 = process_time()
         Q_est.est_Q2()
-        self.time_rec['t_Q2'] = process_time() - t0
-        t0 = process_time()
         Q_est.est_Q3()
-        self.time_rec['t_Q3'] = process_time() - t0
-        t0 = process_time()
         Q_est.est_Q4()
-        self.time_rec['t_Q4'] = process_time() - t0
-        t0 = process_time()
         Q_est.est_Qdiffs()
-        self.time_rec['t_Qdiff'] = process_time() - t0
         self.Q1_diff, self.eta_pie = Q_est.Q1_diff, Q_est.eta_pie
         self.Q2_diff, self.eta_piea0 = Q_est.Q2_diff, Q_est.eta_piea0
         self.Q3_diff, self.eta_piea0star = Q_est.Q3_diff, Q_est.eta_piea0star
@@ -139,7 +134,8 @@ class evaluator:
         
 
         termI1 = self.w_pie * self.pie_A / self.pieb_A * (np.copy(self.reward).flatten() + self.Q1_diff - self.eta_pie)
-        termI2 = self.compute_termI2(data_num, self.state, self.action, self.reward, self.next_state, self.mediator)
+        termI2 = self.compute_termI2(data_num, self.state, self.action, self.reward, self.next_state, self.mediator,
+                                     self.time_idx)
         termI3 = self.compute_termI3(data_num, self.state, self.action, self.reward, self.next_state, self.mediator)
         termI4 = self.compute_termI4(data_num, self.state, self.action, self.reward, self.next_state)
         
@@ -158,9 +154,9 @@ class evaluator:
         self.ind_est[5] = intercept_SE
         
         #base DE
-        self.ind_est[6] = self.compute_base_DE(data_num, self.state, self.action, self.reward, self.mediator)
+        self.ind_est[6] = self.compute_base_DE(data_num, self.state, self.action, self.reward, self.mediator, self.time_idx)
         #base ME
-        self.ind_est[7] = self.compute_base_ME(data_num, self.state, self.action, self.reward, self.mediator)
+        self.ind_est[7] = self.compute_base_ME(data_num, self.state, self.action, self.reward, self.mediator, self.time_idx)
 
         est_DEMESE = np.mean(self.ind_est,1)
         var_DEMESE = np.var(self.ind_est,1)
@@ -169,11 +165,14 @@ class evaluator:
         pass
         
         
-    def compute_termI2(self, data_num, state, action, reward, next_state, mediator):
+    def compute_termI2(self, data_num, state, action, reward, next_state, mediator, time_idx = None):
         pM_S = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
             pM_Sa = self.pmlearner.get_pm_prediction(state, np.array([a]), mediator)
-            pie_a = self.target_policy(state, self.dim_state, a)
+            if self.t_depend_target:
+                pie_a = self.target_policy(state, self.dim_state, a, time_idx)
+            else:
+                pie_a = self.target_policy(state, self.dim_state, a)
             pM_S += pie_a * pM_Sa
             
         pM_SA = self.pmlearner.get_pm_prediction(state, action, mediator)
@@ -218,11 +217,14 @@ class evaluator:
         return termI4
     
     
-    def compute_base_DE(self, data_num, state, action, reward, mediator):
+    def compute_base_DE(self, data_num, state, action, reward, mediator, time_idx = None):
         reward = np.copy(reward).flatten()
         base_DE = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
+            if self.t_depend_target:
+                pie_a = self.target_policy(state, self.dim_state, action = a, time_idx = time_idx).flatten()
+            else:
+                pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
@@ -237,11 +239,14 @@ class evaluator:
             base_DE += pie_a * (Er_Sa - Er_Sa0)
         return base_DE
     
-    def compute_base_ME(self, data_num, state, action, reward, mediator):
+    def compute_base_ME(self, data_num, state, action, reward, mediator, time_idx = None):
         reward = np.copy(reward).flatten()
         base_ME = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
+            if self.t_depend_target:
+                pie_a = self.target_policy(state, self.dim_state, action = a, time_idx = time_idx).flatten()
+            else:
+                pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):

@@ -3,13 +3,15 @@ from numpy.linalg import inv
 from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
-    def __init__(self, dataset, target_policy, control_policy, palearner, ndim=100, truncate=20, dim_state = 1, l2penalty = 1.0):
+    def __init__(self, dataset, target_policy, control_policy, palearner,
+                 ndim=100, truncate=20, dim_state = 1, l2penalty = 1.0, t_depend_target = False):
         
         self.dim_state = dim_state
         self.state = np.copy(dataset['state']).reshape(-1, self.dim_state)
         self.action = np.copy(dataset['action']).reshape(-1, 1)
         self.unique_action = np.unique(dataset['action'])
         self.next_state = np.copy(dataset['next_state']).reshape(-1, self.dim_state)
+        self.time_idx = np.copy(dataset['time_idx'])
         self.s0 = np.copy(dataset['s0']).reshape(-1, self.dim_state)
 
         self.target_policy = target_policy
@@ -20,6 +22,7 @@ class RatioLinearLearner:
         self.rbf_feature.fit(np.vstack((self.s0, self.next_state)))
         self.truncate = truncate
         self.l2penalty = l2penalty
+        self.t_depend_target = t_depend_target
         
         self.palearner = palearner
         pass
@@ -34,7 +37,11 @@ class RatioLinearLearner:
         psi_next = self.feature_engineering(self.next_state)
 
         self.estimate_pa = self.palearner.get_pa_prediction(self.state, self.action)
-        self.target_pa = self.target_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
+        if self.t_depend_target:
+            self.target_pa = self.target_policy(state = self.state, dim_state=self.dim_state, action=self.action,
+                                                time_idx = self.time_idx).flatten()
+        else:
+            self.target_pa = self.target_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
         self.control_pa = self.control_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
         pa_ratio_target = self.target_pa / self.estimate_pa
         pa_ratio_control = self.control_pa / self.estimate_pa
@@ -105,7 +112,12 @@ class RatioLinearLearner:
         psi_next = self.feature_engineering(test_dataset['next_state'])
 
         estimate_pa = self.palearner.get_pa_prediction(test_dataset['state'], test_dataset['action'])
-        target_pa = self.target_policy(state = test_dataset['state'], dim_state = self.dim_state, action=test_dataset['action']).flatten()
+        if self.t_depend_target:
+            target_pa = self.target_policy(state = test_dataset['state'], dim_state = self.dim_state,
+                                           action=test_dataset['action'], time_idx = self.time_idx).flatten()
+        else:
+            target_pa = self.target_policy(state = test_dataset['state'], dim_state = self.dim_state,
+                                           action=test_dataset['action']).flatten()
         control_pa = self.control_policy(state = test_dataset['state'], dim_state = self.dim_state, action = test_dataset['action']).flatten()
         pa_ratio_target = target_pa / estimate_pa
         pa_ratio_control = control_pa / estimate_pa

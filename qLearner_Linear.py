@@ -6,10 +6,12 @@ from numpy.linalg import inv
 from _util import *
 
 class Qlearner():
-    def __init__(self, data, target_policy, control_policy, pmlearner, rewardlearner, ratiolearner, palearner, unique_action, dim_state, dim_mediator,
+    def __init__(self, data, target_policy, control_policy, pmlearner, rewardlearner, ratiolearner, palearner,
+                 unique_action, dim_state, dim_mediator,
                  Q_settings = {'scaler': 'Identity', 'product_tensor': True, 'beta': 3/7, 'include_intercept': False,
                                'expectation_MCMC_iter_Q3': 100, 'expectation_MCMC_iter_Q_diff':100, 'penalty': 10**(-9),
-                              'd': 3, 'min_L': 7}, seed = 0):
+                              'd': 3, 'min_L': 7}, 
+                 seed = 0, t_depend_target = False):
         np.random.seed(seed)
         
         self.unique_action = unique_action
@@ -18,6 +20,7 @@ class Qlearner():
         self.action = data['action']
         self.R = data['reward']
         self.next_state = data['next_state']
+        self.time_idx = data['time_idx']
         self.tuples = self.get_tuples(data)
         
         self.dim_state = dim_state
@@ -47,10 +50,11 @@ class Qlearner():
         #control_policy
         self.control_policy = control_policy
         self.a0 = control_policy(get_a = True)
+        self.t_depend_target = t_depend_target
         
         self.U = self._U4all(self.tuples)
-        self.Sigma_control = self._Sigma(self.tuples, control_policy, self.U)
-        self.Sigma_target = self._Sigma(self.tuples, target_policy, self.U)
+        self.Sigma_control = self._Sigma(self.tuples, 'control', self.U)
+        self.Sigma_target = self._Sigma(self.tuples, 'target', self.U)
         
     def est_Q1(self):
         #Q1
@@ -83,7 +87,6 @@ class Qlearner():
     def est_beta_eta(self, Y_all, U, Sigma_hat):
         est_beta = self._beta_hat(Y_all, U, Sigma_hat)
         eta = self.eta_hat(est_beta)
-        #Q_diff = self.est_Q_diff(self.state, self.mediator, self.action, self.next_state, est_beta, policy)
         return eta, est_beta
         
     def B_spline(self, L = 3, d = 1):
@@ -122,8 +125,9 @@ class Qlearner():
             tuple_t += list(data['mediator'][nt])
             tuple_t += [data['reward'][nt]]
             tuple_t += list(data['next_state'][nt])
+            tuple_t += [data['time_idx'][nt]]
 
-            tuples.append(tuple_t) #['state', 'action', 'mediator', 'reward', 'next_state']
+            tuples.append(tuple_t) #['state', 'action', 'mediator', 'reward', 'next_state', 'time_idx']
         return tuples
 
 
@@ -149,10 +153,15 @@ class Qlearner():
         #print('_u:', np.array(output).reshape(-1,1))
         return np.array(output).reshape(-1,1)
     
-    def _Xi(self, S_next, policy, include_eta = False):
+    def _Xi(self, S_next, t, policy_name, include_eta = False):
         phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
         for a in self.unique_action:
-            pa = policy(state = S_next, dim_state = self.dim_state, action = a)
+            if policy_name == 'target' and self.t_depend_target:
+                pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a, time_idx = t + 1)
+            elif policy_name == 'target':
+                pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a)
+            else:
+                pa = self.control_policy(state = S_next, dim_state = self.dim_state, action = a)
             if pa > 0:
                 sample_phi = []
                 for rep in range(self.expectation_MCMC_iter_Q3):
@@ -176,9 +185,9 @@ class Qlearner():
                                     tuple_i[self.dim_state], include_eta = True) for tuple_i in tuples]
         return U
     
-    def _Sigma(self, tuples, policy, U):
+    def _Sigma(self, tuples, policy_name, U):
         output = [np.matmul(U[i],
-                            (U[i] - self._Xi(np.array(tuples[i][-self.dim_state:]), policy, include_eta = False)).T) for i in range(len(tuples))]
+                            (U[i] - self._Xi(np.array(tuples[i][-(self.dim_state+1):-1]), tuples[i][-1], policy_name, include_eta = False)).T) for i in range(len(tuples))]
         output = np.mean(output,axis=0)
         #output = [np.matmul(self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True),
         #                         (self._U(tuple_i[0], tuple_i[2], tuple_i[1], include_eta = True) - 
@@ -230,7 +239,10 @@ class Qlearner():
         
         Q1_Snext_am, Q2_Snext_am, Q3_Snext_am, Q4_Snext_am = self.init_Qs()
         for a in self.unique_action:
-            pie_a = self.target_policy(next_state, self.dim_state, a)
+            if self.t_depend_target:
+                pie_a = self.target_policy(next_state, self.dim_state, action = a, time_idx = self.time_idx + 1)
+            else:
+                pie_a = self.target_policy(next_state, self.dim_state, a)
             pi0_a = self.control_policy(next_state, self.dim_state, a)
             Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC = self.init_Qs()
             for rep in range(self.expectation_MCMC_iter_Q_diff):
