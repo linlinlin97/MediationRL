@@ -29,24 +29,15 @@ class RatioLinearLearner:
         feature_new = np.hstack([np.repeat(1, feature_new.shape[0]).reshape(-1, 1), feature_new])
         return feature_new
 
-    def policy_pa(self, policy, state, action):
-        num = action.shape[0]
-        target_pa = list(range(num))
-        for i in range(num):
-            target_pa[i] = policy(state[i], action[i])
-            pass
-        target_pa = np.array(target_pa).flatten()
-        return target_pa
-
     def fit(self):
         psi = self.feature_engineering(self.state)
         psi_next = self.feature_engineering(self.next_state)
 
-        estimate_pa = self.palearner.get_pa_prediction(self.state, self.action)
-        target_pa = self.policy_pa(self.target_policy, self.state, self.action)
-        control_pa = self.policy_pa(self.control_policy, self.state, self.action)
-        pa_ratio_target = target_pa / estimate_pa
-        pa_ratio_control = control_pa / estimate_pa
+        self.estimate_pa = self.palearner.get_pa_prediction(self.state, self.action)
+        self.target_pa = self.target_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
+        self.control_pa = self.control_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
+        pa_ratio_target = self.target_pa / self.estimate_pa
+        pa_ratio_control = self.control_pa / self.estimate_pa
         # print(np.mean(ratio)) # close to 1 if behaviour and target are the same
         
         #target_ratio_learning
@@ -100,9 +91,9 @@ class RatioLinearLearner:
         ratio_min = 1 / self.truncate
         ratio_max = self.truncate
         ratio = np.clip(ratio, a_min=ratio_min, a_max=ratio_max)
-        if state.shape[0] > 1:
-            if normalize:
-                ratio /= np.mean(ratio)
+        #if state.shape[0] > 1:
+        #    if normalize:
+         #       ratio /= np.mean(ratio)
         return ratio
 
     def get_r_prediction(self, state, policy = 'target', normalize=True):
@@ -114,8 +105,8 @@ class RatioLinearLearner:
         psi_next = self.feature_engineering(test_dataset['next_state'])
 
         estimate_pa = self.palearner.get_pa_prediction(test_dataset['state'], test_dataset['action'])
-        target_pa = self.policy_pa(self.target_policy, test_dataset['state'], test_dataset['action'])
-        control_pa = self.policy_pa(self.control_policy, test_dataset['state'], test_dataset['action'])
+        target_pa = self.target_policy(state = test_dataset['state'], dim_state = self.dim_state, action=test_dataset['action']).flatten()
+        control_pa = self.control_policy(state = test_dataset['state'], dim_state = self.dim_state, action = test_dataset['action']).flatten()
         pa_ratio_target = target_pa / estimate_pa
         pa_ratio_control = control_pa / estimate_pa
         

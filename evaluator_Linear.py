@@ -86,8 +86,8 @@ class evaluator:
         self.ratiolearner.fit()
         self.w_pie = self.ratiolearner.get_r_prediction(self.state, policy = 'target', normalize=True)
         self.w_a0 = self.ratiolearner.get_r_prediction(self.state, policy = 'control', normalize=True)
-        self.pie_A = self.target_policy(self.state, self.dim_state, self.action, matrix_based = True)
-        self.I_A = self.control_policy(self.state, self.dim_state, self.action, matrix_based = True)
+        self.pie_A = self.target_policy(self.state, self.dim_state, self.action)
+        self.I_A = self.control_policy(self.state, self.dim_state, self.action)
         self.pieb_A = self.palearner.get_pa_prediction(self.state, self.action)
         t_ratio = process_time() - t0
         t0 = process_time()
@@ -173,7 +173,7 @@ class evaluator:
         pM_S = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
             pM_Sa = self.pmlearner.get_pm_prediction(state, np.array([a]), mediator)
-            pie_a = self.target_policy(state, self.dim_state, a, matrix_based = True)
+            pie_a = self.target_policy(state, self.dim_state, a)
             pM_S += pie_a * pM_Sa
             
         pM_SA = self.pmlearner.get_pm_prediction(state, action, mediator)
@@ -222,7 +222,7 @@ class evaluator:
         reward = np.copy(reward).flatten()
         base_DE = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = self.target_policy(state, self.dim_state, action = a, matrix_based = True).flatten()
+            pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):
@@ -241,7 +241,7 @@ class evaluator:
         reward = np.copy(reward).flatten()
         base_ME = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
-            pie_a = self.target_policy(state, self.dim_state, action = a, matrix_based = True).flatten()
+            pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
             sampled_reward_a = []
             sampled_reward_a0 = []
             for rep in range(self.expectation_MCMC_iter):

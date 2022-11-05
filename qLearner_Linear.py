@@ -5,14 +5,6 @@ from scipy.stats import norm
 from numpy.linalg import inv
 from _util import *
 
-class normcdf():
-    def transform(self, S):
-        return norm.cdf(S)
-
-class iden():
-    def transform(self, S):
-        return S
-    
 class Qlearner():
     def __init__(self, data, target_policy, control_policy, pmlearner, rewardlearner, ratiolearner, palearner, unique_action, dim_state, dim_mediator,
                  Q_settings = {'scaler': 'Identity', 'product_tensor': True, 'beta': 3/7, 'include_intercept': False,
@@ -238,8 +230,8 @@ class Qlearner():
         
         Q1_Snext_am, Q2_Snext_am, Q3_Snext_am, Q4_Snext_am = self.init_Qs()
         for a in self.unique_action:
-            pie_a = self.target_policy(next_state, self.dim_state, a, matrix_based = True)
-            pi0_a = self.control_policy(next_state, self.dim_state, a, matrix_based = True)
+            pie_a = self.target_policy(next_state, self.dim_state, a)
+            pi0_a = self.control_policy(next_state, self.dim_state, a)
             Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC = self.init_Qs()
             for rep in range(self.expectation_MCMC_iter_Q_diff):
                 #np.random.seed(rep)
