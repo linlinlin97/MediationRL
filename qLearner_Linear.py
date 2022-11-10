@@ -133,7 +133,7 @@ class Qlearner():
             self.para_dim += 1 #t
             print(self.para_dim)
             
-            #print("Building %d-th basis spline (total %d state-mediator dimemsion) which has %d basis " %(i, self.dim_state + self.dim_mediator,len(self.bspline[i])))
+            print("Building %d-th basis spline (total %d state-mediator dimemsion) which has %d basis " %(i, self.dim_state + self.dim_mediator,len(self.bspline[i])))
             
     def get_tuples(self, data):
         NT = len(data['state'])
