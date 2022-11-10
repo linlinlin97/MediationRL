@@ -131,9 +131,9 @@ class Qlearner():
         if self.t_dependent_Q:
             self.para_dim *= 2 #s, t*s
             self.para_dim += 1 #t
-            print(self.para_dim)
+            #print(self.para_dim)
             
-            print("Building %d-th basis spline (total %d state-mediator dimemsion) which has %d basis " %(i, self.dim_state + self.dim_mediator,len(self.bspline[i])))
+            print("Building %d-th basis spline (total %d state-mediator dimemsion) which has %d basis, in total %d features " %(i, self.dim_state + self.dim_mediator,len(self.bspline[i]),self.para_dim))
             
     def get_tuples(self, data):
         NT = len(data['state'])
@@ -246,8 +246,8 @@ class Qlearner():
     def eta_hat(self, est_beta):
         return est_beta[-1]
 
-    def Q(self, S, M, A):
-        output = self._U(S, M, A)[:-1]
+    def Q(self, S, M, A, t):
+        output = self._U(S, M, A, time_idx = t)[:-1]
         Q1 = np.dot(output.reshape((1,-1)), self.Q1_est_beta[:-1].reshape((-1,)))
         Q2 = np.dot(output.reshape((1,-1)), self.Q2_est_beta[:-1].reshape((-1,)))
         Q3 = np.dot(output.reshape((1,-1)), self.Q3_est_beta[:-1].reshape((-1,)))
@@ -261,7 +261,7 @@ class Qlearner():
         for rep in range(self.expectation_MCMC_iter_Q_diff):
             #np.random.seed(rep)
             m_SA = self.pmlearner.sample_m(state, action, random = True)
-            out_Q1,out_Q2,out_Q3,out_Q4 = self.cal_newQ(state, m_SA, action)
+            out_Q1,out_Q2,out_Q3,out_Q4 = self.cal_newQ(state, m_SA, action, time_idx = self.time_idx)
             Q1_SAm = self.update_exp(rep, Q1_SAm, out_Q1)
             Q2_SAm = self.update_exp(rep, Q2_SAm, out_Q2)
             Q3_SAm = self.update_exp(rep, Q3_SAm, out_Q3)
@@ -279,7 +279,7 @@ class Qlearner():
                 #np.random.seed(rep)
                 m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
                 action_list = [a]*self.NT
-                out_Q1, out_Q2, out_Q3, out_Q4 = self.cal_newQ(next_state, m_Snext_a, action_list)
+                out_Q1, out_Q2, out_Q3, out_Q4 = self.cal_newQ(next_state, m_Snext_a, action_list, time_idx = self.time_idx + 1)
                 Q1_Snext_am_MC = self.update_exp(rep, Q1_Snext_am_MC, out_Q1)
                 Q2_Snext_am_MC = self.update_exp(rep, Q2_Snext_am_MC, out_Q2)
                 Q3_Snext_am_MC = self.update_exp(rep, Q3_Snext_am_MC, out_Q3)
@@ -302,8 +302,8 @@ class Qlearner():
     def update_exp(self, rep, old_est, new_obs):
         return (rep*old_est + new_obs)/(rep+1)
     
-    def cal_newQ(self, s,m,a):
-        Qs = [self.Q(s[i], m[i], a[i]) for i in range(self.NT)]
+    def cal_newQ(self, s,m,a, time_idx):
+        Qs = [self.Q(s[i], m[i], a[i], time_idx[i]) for i in range(self.NT)]
         Q1 = np.array([q[0] for q in Qs]).reshape((-1,))
         Q2 = np.array([q[1] for q in Qs]).reshape((-1,))
         Q3 = np.array([q[2] for q in Qs]).reshape((-1,))
