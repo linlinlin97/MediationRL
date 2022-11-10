@@ -17,7 +17,7 @@ class evaluator:
                  dim_state = 1, dim_mediator = 1, 
                  Q_settings = {'scaler': 'Identity','product_tensor': True, 'beta': 3/7, 'include_intercept': False,
                                'expectation_MCMC_iter_Q3': 100, 'expectation_MCMC_iter_Q_diff':100, 'penalty': 10**(-9),
-                              'd': 3, 'min_L': 7},
+                              'd': 3, 'min_L': 7, "t_dependent_Q": False},
                  expectation_MCMC_iter = 100,
                  seed = 0):
         '''
@@ -109,7 +109,7 @@ class evaluator:
         data_num = self.state.shape[0]
         self.ind_est = np.array([range(data_num)] * 8, dtype=float)
         Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner,
-                              self.ratiolearner, self.palearner, self.unique_action, self.dim_state, self.dim_mediator, 
+                              self.dim_state, self.dim_mediator, 
                               self.Q_settings, self.seed, self.t_depend_target)
         Q_est.est_Q1()
         Q_est.est_Q2()
@@ -225,16 +225,14 @@ class evaluator:
                 pie_a = self.target_policy(state, self.dim_state, action = a, time_idx = time_idx).flatten()
             else:
                 pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
-            sampled_reward_a = []
-            sampled_reward_a0 = []
+            Er_Sa = np.zeros(data_num, dtype=float)
+            Er_Sa0 = np.zeros(data_num, dtype=float)
             for rep in range(self.expectation_MCMC_iter):
                 m_i_a = self.pmlearner.sample_m(state,  np.array([a]), random = True)
                 reward_i_a = self.rewardlearner.get_reward_prediction(state,  np.array([a]), m_i_a)
                 reward_i_a0 = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a)
-                sampled_reward_a.append(reward_i_a)
-                sampled_reward_a0.append(reward_i_a0)
-            Er_Sa = np.mean(sampled_reward_a,0)
-            Er_Sa0 = np.mean(sampled_reward_a0,0)
+                Er_Sa = self.update_exp(rep, Er_Sa, reward_i_a.reshape((-1,)))
+                Er_Sa0 = self.update_exp(rep, Er_Sa0, reward_i_a0.reshape((-1,)))
             
             base_DE += pie_a * (Er_Sa - Er_Sa0)
         return base_DE
@@ -247,19 +245,20 @@ class evaluator:
                 pie_a = self.target_policy(state, self.dim_state, action = a, time_idx = time_idx).flatten()
             else:
                 pie_a = self.target_policy(state, self.dim_state, action = a).flatten()
-            sampled_reward_a = []
-            sampled_reward_a0 = []
+            Er_Sa = np.zeros(data_num, dtype=float)
+            Er_Sa0 = np.zeros(data_num, dtype=float)
             for rep in range(self.expectation_MCMC_iter):
                 m_i_a = self.pmlearner.sample_m(state,  np.array([a]), random = True)
                 m_i_a0 = self.pmlearner.sample_m(state, self.a0, random = True)
                 reward_i_a = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a)
                 reward_i_a0 = self.rewardlearner.get_reward_prediction(state, self.a0, m_i_a0)
-                sampled_reward_a.append(reward_i_a)
-                sampled_reward_a0.append(reward_i_a0)
-            Er_Sa = np.mean(sampled_reward_a,0)
-            Er_Sa0 = np.mean(sampled_reward_a0,0)
+                Er_Sa = self.update_exp(rep, Er_Sa, reward_i_a.reshape((-1,)))
+                Er_Sa0 = self.update_exp(rep, Er_Sa0, reward_i_a0.reshape((-1,)))
             
             base_ME += pie_a * (Er_Sa - Er_Sa0)
         return base_ME
+    
+    def update_exp(self, rep, old_est, new_obs):
+        return (rep*old_est + new_obs)/(rep+1)
         
         
