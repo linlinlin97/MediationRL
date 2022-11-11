@@ -8,7 +8,7 @@ import numpy as np
 from time import process_time
 
 class evaluator:
-    def __init__(self, dataset,
+    def __init__(self, dataset,N, T,
                  QLearner, PMLearner, 
                  RewardLearner, PALearner, RatioLearner,
                  problearner_parameters = {"splitter":["best","random"], "max_depth" : range(1,20)},
@@ -53,6 +53,8 @@ class evaluator:
         self.next_state = np.copy(dataset['next_state'])
         self.time_idx = np.copy(dataset['time_idx'])
         self.s0 = np.copy(dataset['s0'])
+        self.N = N
+        self.T = T
         
         self.dataset = dataset
         self.dim_state = dim_state
@@ -106,7 +108,7 @@ class evaluator:
         pass
     
     def estimate_DE_ME_SE(self):
-        data_num = self.state.shape[0]
+        data_num = self.N * self.T
         self.ind_est = np.array([range(data_num)] * 8, dtype=float)
         Q_est = self.qlearner(self.dataset, self.target_policy, self.control_policy, self.pmlearner, self.rewardlearner,
                               self.dim_state, self.dim_mediator, 
@@ -142,9 +144,9 @@ class evaluator:
         #DE
         self.ind_est[0] = intercept_DE + termI1 - termI2 #
         #ME
-        self.ind_est[1] = intercept_ME +termI2 - termI3 # 
+        self.ind_est[1] = intercept_ME + termI2 - termI3 # 
         #SE
-        self.ind_est[2] = intercept_SE +termI3 - termI4 # 
+        self.ind_est[2] = intercept_SE + termI3 - termI4 # 
         
         #DE
         self.ind_est[3] = intercept_DE
@@ -158,10 +160,11 @@ class evaluator:
         #base ME
         self.ind_est[7] = self.compute_base_ME(data_num, self.state, self.action, self.reward, self.mediator, self.time_idx)
 
-        est_DEMESE = np.mean(self.ind_est,1)
-        var_DEMESE = np.var(self.ind_est,1)
-        self.est_DEMESE = est_DEMESE
-        self.var_DEMESE = var_DEMESE
+        self.est_DEMESE = np.mean(self.ind_est,1)
+        if data_num > 100:
+            self.se_DEMESE = np.array([np.mean(self.ind_est[:,i*self.T:(i+1)*self.T],1) for i in range(self.N)]).std(0)/np.sqrt(self.N)
+        else:
+            self.se_DEMESE = np.std(self.ind_est,1)/np.sqrt(data_num)
         pass
         
         

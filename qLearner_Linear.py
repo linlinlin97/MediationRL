@@ -129,7 +129,7 @@ class Qlearner():
             else:
                 self.para_dim += len(self.bspline[i])
         if self.t_dependent_Q:
-            self.para_dim *= 2 #s, t*s
+            #self.para_dim *= 2 #s, t*s
             self.para_dim += 1 #t
             #print(self.para_dim)
             
@@ -162,7 +162,7 @@ class Qlearner():
             output = list(np.concatenate([np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)]))
         elif not self.product_tensor and self.t_dependent_Q:
             output = list(np.concatenate([np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)]))
-            output += list(np.array(output)*time_idx)
+            #output += list(np.array(output)*time_idx)
             output += [time_idx]
         else:
             raise ValueError('tensor with t_dependen_Q: todo')
