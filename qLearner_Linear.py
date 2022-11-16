@@ -46,6 +46,8 @@ class Qlearner():
             self.scaler = iden()
             self.sm_mean = np.mean(self.tuples_array[:,self.state_mediator_col],axis = 0)
             self.sm_std = np.std(self.tuples_array[:,self.state_mediator_col],axis = 0)
+            self.t_mean = np.mean(self.tuples_array[:,-1],axis = 0)
+            self.t_std = np.std(self.tuples_array[:,-1],axis = 0)
             
         self.pmlearner = pmlearner
         self.rewardlearner = rewardlearner
@@ -128,10 +130,6 @@ class Qlearner():
                 self.para_dim *= len(self.bspline[i])
             else:
                 self.para_dim += len(self.bspline[i])
-        if self.t_dependent_Q:
-            #self.para_dim *= 2 #s, t*s
-            self.para_dim += 1 #t
-            #print(self.para_dim)
             
             print("Building %d-th basis spline (total %d state-mediator dimemsion) which has %d basis, in total %d features " %(i, self.dim_state + self.dim_mediator,len(self.bspline[i]),self.para_dim))
             
@@ -154,31 +152,30 @@ class Qlearner():
         x = np.hstack([S, M])
         if self.scaler_setting == "NormCdf" or self.scaler_setting == "Standardize":
             x = (x-self.sm_mean)/self.sm_std
+            if time_idx:
+                time_idx = (time_idx - self.t_mean)/self.t_std
         x = self.scaler.transform(x)
         
-        if self.product_tensor and not self.t_dependent_Q:
+        if self.product_tensor:
             output = list(map(np.prod,(product(*[np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)],repeat=1))))
-        elif not self.product_tensor and not self.t_dependent_Q:
-            output = list(np.concatenate([np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)]))
-        elif not self.product_tensor and self.t_dependent_Q:
-            output = list(np.concatenate([np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)]))
-            #output += list(np.array(output)*time_idx)
-            output += [time_idx]
         else:
-            raise ValueError('tensor with t_dependen_Q: todo')
+            output = list(np.concatenate([np.array([func(s) for func in f]) for f,s in zip(self.bspline, x)]))
+            
         if A == 0:
             output += [0] * self.para_dim  + [0] #0 for the intercept
         elif A == 1:
             output = [0] * self.para_dim + output + [1] #1 for the intercept for Q_A1
         else:
             raise ValueError('A is not in [0,1]')
+        
+        if self.t_dependent_Q:
+            output += [time_idx]
 
         if include_eta:
             output += [1]
         else:
             output += [0]
-        #print('_u:', np.array(output).reshape(-1,1))
-        return np.array(output).reshape(-1,1)
+        return np.array(output).reshape(-1,1) #[sm_0,sm_1,intercept, t, eta]
     
     def _Xi(self, S_next, t, policy_name, include_eta = False):
         phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
@@ -196,18 +193,23 @@ class Qlearner():
                     m = self.pmlearner.sample_m(state = S_next, action = np.array([a]), random = True)
                     m = m.reshape((self.dim_mediator,))
                     if self.t_dependent_Q:
-                        sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a, time_idx = t+1)[:-1].reshape(-1,))
+                        sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a, time_idx = t+1)[:-2].reshape(-1,))
                     else:
                         sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a)[:-1].reshape(-1,))
                 phi += (np.array(sample_phi)*pa).reshape(-1,)  
             else:
                 phi += np.zeros((self.para_dim*len(self.unique_action)+1,))
+        
+        if self.t_dependent_Q:
+            if self.scaler_setting == "NormCdf" or self.scaler_setting == "Standardize":
+                phi = list(phi) + [(t + 1 - self.t_mean)/self.t_std]
+            else:
+                phi = list(phi) + [t+1]
             
         if include_eta:
             phi = list(phi) + [1]
         else:
             phi = list(phi) + [0]
-        #print('_Xi:', np.array(phi).reshape(-1,1))
         return np.array(phi).reshape(-1,1)
     
     def _U4all(self, tuples):
