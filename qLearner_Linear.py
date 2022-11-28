@@ -152,7 +152,7 @@ class Qlearner():
         x = np.hstack([S, M])
         if self.scaler_setting == "NormCdf" or self.scaler_setting == "Standardize":
             x = (x-self.sm_mean)/self.sm_std
-            if time_idx:
+            if time_idx is not None:
                 time_idx = (time_idx - self.t_mean)/self.t_std
         x = self.scaler.transform(x)
         
