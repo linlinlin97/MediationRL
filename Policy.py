@@ -5,7 +5,7 @@ def target_policy(state, dim_state = 1, action=None):
     # if action is not None, then return the probability
     if dim_state == 1:
         return target_policy_Gaussian_toy(state, dim_state, action)
-    else:
+    elif dim_state == 3:
         return target_policy_semi(state, dim_state, action)
         
 def target_policy_Gaussian_toy(state, dim_state = None, action=None):

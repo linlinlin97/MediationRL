@@ -3,12 +3,14 @@ from numpy.linalg import inv
 from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
-    def __init__(self, dataset, target_policy, control_policy, palearner,
-                 ndim=100, truncate=20, dim_state = 1, l2penalty = 1.0, t_depend_target = False):
+    def __init__(self, dataset, target_policy, control_policy, palearner, pmlearner,
+                 ndim=100, truncate=20, dim_state = 1, dim_mediator = 2, l2penalty = 1.0, t_depend_target = False):
         
         self.dim_state = dim_state
+        self.dim_mediator = dim_mediator
         self.state = np.copy(dataset['state']).reshape(-1, self.dim_state)
         self.action = np.copy(dataset['action']).reshape(-1, 1)
+        self.mediator = np.copy(dataset['mediator']).reshape(-1, self.dim_mediator)
         self.unique_action = np.unique(dataset['action'])
         self.next_state = np.copy(dataset['next_state']).reshape(-1, self.dim_state)
         self.time_idx = np.copy(dataset['time_idx'])
@@ -25,6 +27,7 @@ class RatioLinearLearner:
         self.t_depend_target = t_depend_target
         
         self.palearner = palearner
+        self.pmlearner = pmlearner
         pass
 
     def feature_engineering(self, feature):
@@ -45,12 +48,16 @@ class RatioLinearLearner:
         self.control_pa = self.control_policy(state = self.state, dim_state=self.dim_state, action=self.action).flatten()
         pa_ratio_target = self.target_pa / self.estimate_pa
         pa_ratio_control = self.control_pa / self.estimate_pa
+        rho = self.rho_SAM(self.state, self.action, self.mediator, self.time_idx)
+        pam_ratio_G = self.control_pa / self.estimate_pa * rho
         # print(np.mean(ratio)) # close to 1 if behaviour and target are the same
         
         #target_ratio_learning
         self.beta_target = self._beta(psi, psi_next, pa_ratio_target)
         #control_ratio_learning
         self.beta_control = self._beta(psi, psi_next, pa_ratio_control)
+        #G_ratio_learning
+        self.beta_G = self._beta(psi, psi_next, pam_ratio_G)
         pass
     
     def _beta(self, psi, psi_next, pa_ratio):
@@ -95,6 +102,8 @@ class RatioLinearLearner:
             ratio = np.matmul(psi, self.beta_target).flatten()
         elif policy == 'control':
             ratio = np.matmul(psi, self.beta_control).flatten()
+        elif policy == 'G':
+            ratio = np.matmul(psi, self.beta_G).flatten()
         ratio_min = 1 / self.truncate
         ratio_max = self.truncate
         ratio = np.clip(ratio, a_min=ratio_min, a_max=ratio_max)
@@ -133,3 +142,18 @@ class RatioLinearLearner:
         rmse_control = [np.vstack([rmse_control[i], np.matmul(psi[i].reshape(1, -1),self.beta_control)-1]) for i in range(test_dataset['state'].shape[0])]
         rmse_control = np.sqrt(np.mean(np.square(np.mean(rmse_control,axis=0)))) 
         return rmse_target, rmse_control
+    
+    def rho_SAM(self, state, action, mediator, time_idx = None):
+        data_num = len(action)
+        pM_S = np.zeros(data_num, dtype=float)
+        for a in self.unique_action:
+            pM_Sa = self.pmlearner.get_pm_prediction(state, np.array([a]), mediator)
+            if self.t_depend_target:
+                pie_a = self.target_policy(state, self.dim_state, a, time_idx)
+            else:
+                pie_a = self.target_policy(state, self.dim_state, a)
+            pM_S += pie_a * pM_Sa
+            
+        pM_SA = self.pmlearner.get_pm_prediction(state, action, mediator)
+        
+        return pM_S / pM_SA

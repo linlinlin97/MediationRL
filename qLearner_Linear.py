@@ -67,6 +67,9 @@ class Qlearner():
         self.U = self._U4all(self.tuples)
         self.Sigma_control = self._Sigma(self.tuples, 'control', self.U)
         self.Sigma_target = self._Sigma(self.tuples, 'target', self.U)
+        self.Sigma_G = self._Sigma(self.tuples, 'G', self.U)
+        
+        self.Er_Sa0m = self._Er_Sa0m()
         
     def est_Q1(self):
         #Q1
@@ -80,22 +83,28 @@ class Qlearner():
         
     def est_Q3(self):
         #Q3 
+        self.eta_piea0star, self.Q3_est_beta = self.est_beta_eta(self.Er_Sa0m, self.U, self.Sigma_target)
+        
+    def est_Q4(self):
+        #Q4
+        self.eta_G, self.Q4_est_beta = self.est_beta_eta(self.Er_Sa0m, self.U, self.Sigma_G)        
+        
+    def est_Q5(self):
+        #Q5
+        self.eta_a0, self.Q5_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_control)
+    
+    def est_Qdiffs(self):
+        self.Q1_diff, self.Q2_diff, self.Q3_diff, self.Q4_diff_1, self.Q4_diff_2, self.Q5_diff = self._Q_diff(self.state, self.mediator, self.action, self.next_state)
+        
+    def _Er_Sa0m(self):
         Er_Sa0m = np.zeros(self.NT, dtype=float)
         for rep in range(self.expectation_MCMC_iter_Q3):
             #np.random.seed(rep)
             m_Sa0 = self.pmlearner.sample_m(self.state, self.a0, random = True)
             r_Sa0m = self.rewardlearner.get_reward_prediction(self.state, self.a0, m_Sa0)
             Er_Sa0m = self.update_exp(rep, Er_Sa0m, r_Sa0m.reshape((-1,)))
-        self.eta_piea0star, self.Q3_est_beta = self.est_beta_eta(Er_Sa0m, self.U, self.Sigma_target)
-        
-    def est_Q4(self):
-        #Q4
-        self.eta_a0, self.Q4_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_control)
-        #time_leanr_Q = time.time() - t0
-    
-    def est_Qdiffs(self):
-        self.Q1_diff, self.Q2_diff, self.Q3_diff, self.Q4_diff = self._Q_diff(self.state, self.mediator, self.action, self.next_state)
-        
+        return Er_Sa0m
+            
     def est_beta_eta(self, Y_all, U, Sigma_hat):
         est_beta = self._beta_hat(Y_all, U, Sigma_hat)
         eta = self.eta_hat(est_beta)
@@ -152,7 +161,7 @@ class Qlearner():
         x = np.hstack([S, M])
         if self.scaler_setting == "NormCdf" or self.scaler_setting == "Standardize":
             x = (x-self.sm_mean)/self.sm_std
-            if time_idx is not None:
+            if time_idx:
                 time_idx = (time_idx - self.t_mean)/self.t_std
         x = self.scaler.transform(x)
         
@@ -180,23 +189,22 @@ class Qlearner():
     def _Xi(self, S_next, t, policy_name, include_eta = False):
         phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
         for a in self.unique_action:
-            if policy_name == 'target' and self.t_depend_target:
-                pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a, time_idx = t + 1)
-            elif policy_name == 'target':
-                pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a)
-            else:
+            if policy_name == 'target':
+                pa = self.target_pa_next(S_next, a, t)
+            elif policy_name == 'control' or policy_name == 'G':
                 pa = self.control_policy(state = S_next, dim_state = self.dim_state, action = a)
+                
             if pa > 0:
-                sample_phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
-                for rep in range(self.expectation_MCMC_iter_Q3):
-                    #np.random.seed(rep)
-                    m = self.pmlearner.sample_m(state = S_next, action = np.array([a]), random = True)
-                    m = m.reshape((self.dim_mediator,))
-                    if self.t_dependent_Q:
-                        sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a, time_idx = t+1)[:-2].reshape(-1,))
-                    else:
-                        sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a)[:-1].reshape(-1,))
+                if policy_name == 'G':
+                    sample_phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
+                    for a_star in self.unique_action:
+                        pa_star = self.target_pa_next(S_next, a_star, t)
+                        sample_phi += pa_star * self.MCMC_Em_phi(S_next, a_star, t)       
+                else:
+                    sample_phi = self.MCMC_Em_phi(S_next, a, t)
+                    
                 phi += (np.array(sample_phi)*pa).reshape(-1,)  
+                
             else:
                 phi += np.zeros((self.para_dim*len(self.unique_action)+1,))
         
@@ -211,6 +219,24 @@ class Qlearner():
         else:
             phi = list(phi) + [0]
         return np.array(phi).reshape(-1,1)
+    
+    def MCMC_Em_phi(self, S_next, a, t):
+        sample_phi = np.zeros((self.para_dim*len(self.unique_action)+1,))
+        for rep in range(self.expectation_MCMC_iter_Q3):
+            m = self.pmlearner.sample_m(state = S_next, action = np.array([a]), random = True)
+            m = m.reshape((self.dim_mediator,))
+            if self.t_dependent_Q:
+                sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a, time_idx = t+1)[:-2].reshape(-1,))
+            else:
+                sample_phi = self.update_exp(rep, sample_phi, self._U(S_next, m, a)[:-1].reshape(-1,))
+        return sample_phi
+        
+    def target_pa_next(self, S_next, a, t):
+        if self.t_depend_target:
+            pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a, time_idx = t + 1)
+        else:
+            pa = self.target_policy(state = S_next, dim_state = self.dim_state, action = a)
+        return pa
     
     def _U4all(self, tuples):
         if self.t_dependent_Q:
@@ -248,54 +274,58 @@ class Qlearner():
     def eta_hat(self, est_beta):
         return est_beta[-1]
 
-    def Q(self, S, M, A, t):
+    def Q_1235(self, S, M, A, t):
         output = self._U(S, M, A, time_idx = t)[:-1]
         Q1 = np.dot(output.reshape((1,-1)), self.Q1_est_beta[:-1].reshape((-1,)))
         Q2 = np.dot(output.reshape((1,-1)), self.Q2_est_beta[:-1].reshape((-1,)))
         Q3 = np.dot(output.reshape((1,-1)), self.Q3_est_beta[:-1].reshape((-1,)))
-        Q4 = np.dot(output.reshape((1,-1)), self.Q4_est_beta[:-1].reshape((-1,)))
-        return Q1, Q2, Q3, Q4
+        Q5 = np.dot(output.reshape((1,-1)), self.Q5_est_beta[:-1].reshape((-1,)))
+        return Q1, Q2, Q3, Q5
         #return sum(map(operator.mul, output, est_beta[:-1]))
 
     def _Q_diff(self, state, mediator, action, next_state):
         #MCMC to get the mean over m
-        Q1_SAm, Q2_SAm, Q3_SAm, Q4_SAm = self.init_Qs()
+        Q1_SAm, Q2_SAm, Q3_SAm, Q5_SAm = self.init_Qs()
         for rep in range(self.expectation_MCMC_iter_Q_diff):
             #np.random.seed(rep)
             m_SA = self.pmlearner.sample_m(state, action, random = True)
-            out_Q1,out_Q2,out_Q3,out_Q4 = self.cal_newQ(state, m_SA, action, time_idx = self.time_idx)
+            out_Q1,out_Q2,out_Q3,out_Q5 = self.cal_newQ_1235(state, m_SA, action, time_idx = self.time_idx)
             Q1_SAm = self.update_exp(rep, Q1_SAm, out_Q1)
             Q2_SAm = self.update_exp(rep, Q2_SAm, out_Q2)
             Q3_SAm = self.update_exp(rep, Q3_SAm, out_Q3)
-            Q4_SAm = self.update_exp(rep, Q4_SAm, out_Q4)
+            Q5_SAm = self.update_exp(rep, Q5_SAm, out_Q5)
         
-        Q1_Snext_am, Q2_Snext_am, Q3_Snext_am, Q4_Snext_am = self.init_Qs()
+        Q1_Snext_am, Q2_Snext_am, Q3_Snext_am, Q5_Snext_am = self.init_Qs()
+        Q4_Snext_am = np.zeros(self.NT, dtype=float)
+        Q4_S_am = np.zeros(self.NT, dtype=float)
+        Q4_SaM = np.zeros(self.NT, dtype=float)
         for a in self.unique_action:
-            if self.t_depend_target:
-                pie_a = self.target_policy(next_state, self.dim_state, action = a, time_idx = self.time_idx + 1)
-            else:
-                pie_a = self.target_policy(next_state, self.dim_state, a)
-            pi0_a = self.control_policy(next_state, self.dim_state, a)
-            Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC = self.init_Qs()
-            for rep in range(self.expectation_MCMC_iter_Q_diff):
-                #np.random.seed(rep)
-                m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
-                action_list = [a]*self.NT
-                out_Q1, out_Q2, out_Q3, out_Q4 = self.cal_newQ(next_state, m_Snext_a, action_list, time_idx = self.time_idx + 1)
-                Q1_Snext_am_MC = self.update_exp(rep, Q1_Snext_am_MC, out_Q1)
-                Q2_Snext_am_MC = self.update_exp(rep, Q2_Snext_am_MC, out_Q2)
-                Q3_Snext_am_MC = self.update_exp(rep, Q3_Snext_am_MC, out_Q3)
-                Q4_Snext_am_MC = self.update_exp(rep, Q4_Snext_am_MC, out_Q4)
-            Q1_Snext_am += pie_a * Q1_Snext_am_MC.reshape((-1,))
-            Q2_Snext_am += pie_a * Q2_Snext_am_MC.reshape((-1,))
-            Q3_Snext_am += pie_a * Q3_Snext_am_MC.reshape((-1,))
-            Q4_Snext_am += pi0_a * Q4_Snext_am_MC.reshape((-1,))
+            pie_a_Sprime = self.target_pa_next(next_state, a, self.time_idx)          
+            pi0_a_Sprime = self.control_policy(next_state, self.dim_state, a)
+            pi0_a_S = self.control_policy(state, self.dim_state, a)
+            
+            Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC, Q5_Snext_am_MC, Q4_S_am_MC = self.cal_Q_am_MC(next_state, state, action, a)
+                    
+            Q1_Snext_am += pie_a_Sprime * Q1_Snext_am_MC.reshape((-1,))
+            Q2_Snext_am += pie_a_Sprime * Q2_Snext_am_MC.reshape((-1,))
+            Q3_Snext_am += pie_a_Sprime * Q3_Snext_am_MC.reshape((-1,))
+            Q4_Snext_am += pi0_a_Sprime * Q4_Snext_am_MC.reshape((-1,))
+            Q5_Snext_am += pi0_a_Sprime * Q5_Snext_am_MC.reshape((-1,))
+            
+            Q4_S_am += pi0_a_S * Q4_S_am_MC.reshape((-1,))
+            
+            action_list = [a]*self.NT
+            Q4_SaM += pi0_a_S * self.cal_newQ_4(state, mediator, action_list, time_idx = self.time_idx)
+            
+        Q4_SAM = self.cal_newQ_4(state, mediator, action, self.time_idx)
         
         Q1_diff = Q1_Snext_am - Q1_SAm.reshape((-1,))
         Q2_diff = Q2_Snext_am - Q2_SAm.reshape((-1,))
         Q3_diff = Q3_Snext_am - Q3_SAm.reshape((-1,))
-        Q4_diff = Q4_Snext_am - Q4_SAm.reshape((-1,))
-        return Q1_diff, Q2_diff, Q3_diff, Q4_diff
+        Q5_diff = Q5_Snext_am - Q5_SAm.reshape((-1,))
+        Q4_diff_1 = Q4_Snext_am -  Q4_SAM.reshape((-1,))
+        Q4_diff_2 = Q4_SaM - Q4_S_am
+        return Q1_diff, Q2_diff, Q3_diff, Q4_diff_1, Q4_diff_2, Q5_diff
     
     
     def init_Qs(self):
@@ -304,10 +334,69 @@ class Qlearner():
     def update_exp(self, rep, old_est, new_obs):
         return (rep*old_est + new_obs)/(rep+1)
     
-    def cal_newQ(self, s,m,a, time_idx):
-        Qs = [self.Q(s[i], m[i], a[i], time_idx[i]) for i in range(self.NT)]
+    def cal_newQ_1235(self, s,m,a, time_idx):
+        Qs = [self.Q_1235(s[i], m[i], a[i], time_idx[i]) for i in range(self.NT)]
         Q1 = np.array([q[0] for q in Qs]).reshape((-1,))
         Q2 = np.array([q[1] for q in Qs]).reshape((-1,))
         Q3 = np.array([q[2] for q in Qs]).reshape((-1,))
-        Q4 = np.array([q[3] for q in Qs]).reshape((-1,))
-        return Q1, Q2, Q3, Q4
+        Q5 = np.array([q[3] for q in Qs]).reshape((-1,))
+        return Q1, Q2, Q3, Q5
+    
+    def Q_4(self, S, M, A, t):
+        output = self._U(S, M, A, time_idx = t)[:-1]
+        Q4 = np.dot(output.reshape((1,-1)), self.Q4_est_beta[:-1].reshape((-1,)))
+        return Q4
+    
+    def cal_newQ_4(self, s,m,a, time_idx):
+        Qs = [self.Q_4(s[i], m[i], a[i], time_idx[i]) for i in range(self.NT)]
+        Q4 = np.array(Qs).reshape((-1,))
+        return Q4
+    
+    def cal_Q_am_MC(self,next_state, state, action, a):
+        Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q5_Snext_am_MC = self.init_Qs()
+        Q4_Snext_am_MC_astar = dict()
+        Q4_S_am_MC= np.zeros(self.NT, dtype=float)
+        pie_a_star = dict()
+        for a_star in self.unique_action:
+            Q4_Snext_am_MC_astar[a_star] = np.zeros(self.NT, dtype=float)
+            pie_a_star[a_star] = self.target_pa_next(next_state, a_star, self.time_idx)
+            
+        for rep in range(self.expectation_MCMC_iter_Q_diff):
+            #np.random.seed(rep)
+            Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q5_Snext_am_MC = self.update_Q1235_Snext_am_MC(rep, next_state, a, Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q5_Snext_am_MC)
+            
+            Q4_Snext_am_MC_astar = self.update_Q4_Snext_am_MC_astar(rep, next_state, Q4_Snext_am_MC_astar)
+            
+            Q4_S_am_MC = self.update_Q4_S_am_MC(rep, state, action, a, Q4_S_am_MC)
+                
+        Q4_Snext_am_MC = np.zeros(self.NT, dtype=float)
+        for a_star in self.unique_action:
+            Q4_Snext_am_MC += pie_a_star[a_star] * Q4_Snext_am_MC_astar[a_star]
+            
+        return Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q4_Snext_am_MC, Q5_Snext_am_MC, Q4_S_am_MC
+    
+    def update_Q1235_Snext_am_MC(self, rep, next_state, a, Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q5_Snext_am_MC):
+        m_Snext_a = self.pmlearner.sample_m(next_state, np.array([a]), random = True)
+        action_list = [a]*self.NT
+        out_Q1, out_Q2, out_Q3, out_Q5 = self.cal_newQ_1235(next_state, m_Snext_a, action_list, time_idx = self.time_idx + 1)
+        Q1_Snext_am_MC = self.update_exp(rep, Q1_Snext_am_MC, out_Q1)
+        Q2_Snext_am_MC = self.update_exp(rep, Q2_Snext_am_MC, out_Q2)
+        Q3_Snext_am_MC = self.update_exp(rep, Q3_Snext_am_MC, out_Q3)
+        Q5_Snext_am_MC = self.update_exp(rep, Q5_Snext_am_MC, out_Q5)
+        return Q1_Snext_am_MC, Q2_Snext_am_MC, Q3_Snext_am_MC, Q5_Snext_am_MC
+    
+    def update_Q4_Snext_am_MC_astar(self, rep, next_state, Q4_Snext_am_MC_astar):
+        for a_star in self.unique_action:
+            m_Snext_a_star = self.pmlearner.sample_m(next_state, np.array([a_star]), random = True)
+            action_list = [a_star]*self.NT
+            out_Q4_a_star = self.cal_newQ_4(next_state, m_Snext_a_star, action_list, time_idx = self.time_idx + 1)
+            Q4_Snext_am_MC_astar[a_star] = self.update_exp(rep, Q4_Snext_am_MC_astar[a_star], out_Q4_a_star)
+        return Q4_Snext_am_MC_astar
+    
+    def update_Q4_S_am_MC(self, rep, state, action, a, Q4_S_am_MC):
+        m_S_A = self.pmlearner.sample_m(state, action, random = True)
+        action_list = [a]*self.NT
+        out_Q4 = self.cal_newQ_4(state, m_S_A, action_list, time_idx = self.time_idx)
+        Q4_S_am_MC = self.update_exp(rep, Q4_S_am_MC, out_Q4)
+        return Q4_S_am_MC
+        
