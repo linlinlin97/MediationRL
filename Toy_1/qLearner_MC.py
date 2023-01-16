@@ -24,30 +24,28 @@ class Qlearner:
         
         self.pmlearner = PMLearner
         self.target_policy = target_policy
+        self.control_policy = control_policy
         
         if Q_func == "Q1":
-            #self.Y = np.copy(data['reward']).flatten()-self.true_eta_target
-            self.Y = RewardModel(self.state,self.action,self.mediator, matrix_based = True)#-self.true_eta_target
+            self.Y = RewardModel(self.state,self.action,self.mediator, matrix_based = True)
         elif Q_func == "Q2":
             self.a0 = control_policy(get_a = True)
-            self.Y = RewardModel(self.state,self.a0,self.mediator, matrix_based = True) #- self.true_eta_target_a0
-        elif Q_func == "Q3":
+            self.Y = RewardModel(self.state,self.a0,self.mediator, matrix_based = True)
+        elif Q_func == "Q3" or Q_func == 'Q4':
             self.a0 = control_policy(get_a = True)
             self.Y = np.zeros(shape=self.state.shape).flatten()
             for m in self.unique_mediator:
                 Er_Sa0m = RewardModel(self.state,self.a0,m, matrix_based = True)
                 pm_Sa0 = self.pmlearner(self.state, self.a0, m)
-                self.Y += Er_Sa0m * pm_Sa0 
-            #self.Y -= self.true_eta_target_a0star   
-        elif Q_func == "Q4":
+                self.Y += Er_Sa0m * pm_Sa0  
+        elif Q_func == "Q5":
             self.a0 = control_policy(get_a = True)
-            #self.Y = np.copy(data['reward']).flatten()-self.true_eta_a0
-            self.Y = RewardModel(self.state,self.action,self.mediator, matrix_based = True)#-self.true_eta_a0
+            self.Y = RewardModel(self.state,self.action,self.mediator, matrix_based = True)
         else:
             "Warning!"
             
         self.phi = self.get_phi(self.state, self.action, self.mediator, include_eta = True)
-        self.w = self.get_exp_w(self.next_state)
+        self.w = self.get_exp_w(self.next_state, Q_func)
 
         
     def get_phi(self, state, action, mediator, include_eta = False):
@@ -79,16 +77,26 @@ class Qlearner:
                 w += (np.array(X_Sprime_am).T * pie_a * pm_aSprime).T
         return w
 
-    def get_exp_w(self,next_state):
+    def get_exp_w(self,next_state, Q_func):
         next_state1 = np.copy(next_state).flatten()
         w = np.zeros(shape = (len(next_state1),8))
         for s in self.unique_state:
             p_s = self.simulator.sam2nextstate_model(self.state, self.action, self.mediator,random = False)
             p_s = s * p_s + (1-s) * (1-p_s)
             for a in self.unique_action:
-                pie_a = self.target_policy(s*np.ones(len(next_state1)), a, matrix_based = True)
+                if Q_func in ['Q1','Q2','Q3']:
+                    pie_a = self.target_policy(s*np.ones(len(next_state1)), a, matrix_based = True)
+                elif Q_func in ['Q4','Q5']:
+                    pie_a = self.control_policy(s*np.ones(len(next_state1)), a, matrix_based = True)
                 for m in self.unique_mediator:
-                    pm_aSprime = self.pmlearner(s*np.ones(len(next_state1)), a, m)
+                    if Q_func == 'Q4':
+                        pm_aSprime = np.zeros(len(next_state1))
+                        for a_prime in self.unique_action:
+                            pie_aprime = self.target_policy(s*np.ones(len(next_state1)), a_prime, matrix_based = True)
+                            pm_aSprime_aprime = self.pmlearner(s*np.ones(len(next_state1)), a_prime, m)
+                            pm_aSprime += pm_aSprime_aprime * pie_aprime
+                    else:
+                        pm_aSprime = self.pmlearner(s*np.ones(len(next_state1)), a, m)
                     X_Sprime_am = self.get_phi(s*np.ones(len(next_state1)), a, m)
                     w += (np.array(X_Sprime_am).T * p_s* pie_a * pm_aSprime).T
         return w

@@ -210,8 +210,6 @@ class Simulator:
             
             
         self.trajectory_list = []
-        self.target_policy_trajectory_list = []
-        self.fixed_policy_trajectory_list = []
         self.stationary_target_policy_state_density = None
         self.stationary_fixed_policy_state_density = None
         self.stationary_behaviour_policy_state_density = None
@@ -223,20 +221,6 @@ class Simulator:
     def sample_init_state(self):
         init_state = self.init_state_model()
         return init_state
-
-#    def logistic_sampler(self, prob):
-#        prob_size = np.array(prob).flatten().size
-#        if prob_size <= 2:
-#            if prob.ndim == 1:
-#                prob = prob[0]
-#            elif prob.ndim == 2:
-#                prob = prob[0][0]
-#            prob_arr = np.array([1-prob, prob])
-#            random_y = np.random.choice([0, 1], 1, p=prob_arr)
-#        else:
-#            prob_arr = prob.flatten()
-#            random_y = np.random.choice([-1, 0, 1], 1, p=prob_arr)
-#        return random_y
 
     def sample_s2action(self, state, random=True):
         '''
@@ -316,7 +300,7 @@ class Simulator:
             self.trajectory_list = tmp_list
             return to_return_list
 
-    def sample_one_target_policy_trajectory(self, num_time, target_policy, burn_in):
+    def sample_one_target_policy_trajectory(self, num_time, target_policy, control_policy, burn_in, sample_policy = 'control'):
         '''
         Output: A list containing 4 elements: state, action, mediator, reward
         '''
@@ -332,9 +316,17 @@ class Simulator:
 
         random_state[0] = init_state.reshape(-1)
         for i in range(num_time):
-            random_action[i] = target_policy(random_state[i])
+            if sample_policy == 'control':
+                random_action[i] = control_policy(random_state[i])
+                action_t = random_action[i]
+            elif sample_policy == 'target':
+                random_action[i] = target_policy(random_state[i])
+                action_t = random_action[i]
+            else:
+                random_action[i] = control_policy(random_state[i])
+                action_t = target_policy(random_state[i])
             random_mediator[i] = self.sample_sa2mediator(
-                random_state[i], random_action[i])
+                random_state[i], action_t)
             random_reward[i] = self.sample_sam2reward(
                 random_state[i], random_action[i], random_mediator[i])
             random_state[i+1] = self.sample_sam2nextstate(
@@ -353,33 +345,15 @@ class Simulator:
         return random_trajectory
 
     def sample_target_policy_trajectory(self, num_trajectory, num_time, seed, policy = "target", burn_in=False, return_trajectory=False):
-        if policy == "target":
-            tmp_list = self.target_policy_trajectory_list.copy()
-            self.target_policy_trajectory_list = []
-            for i in range(num_trajectory):
-                np.random.seed(i + 7654321*seed)
-                one_trajectory = self.sample_one_target_policy_trajectory(
-                    num_time, target_policy, burn_in)
-                self.target_policy_trajectory_list.append(one_trajectory)
-                pass
-            if return_trajectory:
-                to_return_list = self.target_policy_trajectory_list.copy()
-                self.target_policy_trajectory_list = tmp_list
-                return to_return_list
-        else:
-            tmp_list = self.fixed_policy_trajectory_list.copy()
-            self.fixed_policy_trajectory_list = []
-            for i in range(num_trajectory):
-                np.random.seed(i + 7654321*seed)
-                one_trajectory = self.sample_one_target_policy_trajectory(
-                    num_time, control_policy, burn_in)
-                self.fixed_policy_trajectory_list.append(one_trajectory)
-                pass
-
-            if return_trajectory:
-                to_return_list = self.fixed_policy_trajectory_list.copy()
-                self.fixed_policy_trajectory_list = tmp_list
-                return to_return_list
+        self.target_policy_trajectory_list = []
+        for i in range(num_trajectory):
+            np.random.seed(i + 7654321*seed)
+            one_trajectory = self.sample_one_target_policy_trajectory(
+                    num_time, target_policy, control_policy, burn_in, sample_policy = policy)
+            self.target_policy_trajectory_list.append(one_trajectory)
+            pass
+        if return_trajectory:
+            return self.target_policy_trajectory_list
 
     def onetrajectory2iid(self, trajectory):
         num_time = trajectory[1].shape[0]
