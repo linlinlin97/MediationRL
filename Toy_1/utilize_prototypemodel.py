@@ -41,6 +41,7 @@ class RewardModel:
         np.random.seed(self.seed)
         return self.reward_model(state, action, mediator)
 
+
 class PAModel:
     def __init__(self, func, seed = 1):
         self.pa_model = func

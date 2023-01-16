@@ -29,6 +29,9 @@ def true_q_function(state, action, mediator, typ = "Q1"):
         model = np.array([ 8.44807161, -5.01250534, -1.21971234,  6.06133082,  8.26765716,
        -5.44422513,  4.97966689])
     elif typ == "Q4":
+        model = np.array([  8.11246785, -4.527494  , -1.10169265,  5.95666873,  7.94951035,
+       -4.91744047,  4.97966689 ])
+    elif typ == "Q5":
         model = np.array([  5.2622589 ,  -6.71423051,  -6.55788647,   2.44766102,
          1.80261113, -11.33492822,  -3.5351791 ])
     Indicator = get_phi(state, action1, mediator1)
@@ -52,6 +55,8 @@ def false_q_function(state, action, mediator, typ = "Q1"):
         model = np.random.normal(loc=2, scale=1, size=7)
     elif typ == "Q4":
         model = np.random.normal(loc=1.5, scale=1, size=7)
+    elif typ == "Q5":
+        model = np.random.normal(loc=1.5, scale=1, size=7)
     Indicator = get_phi(state, action1, mediator1)
     noise = np.matmul(Indicator, model)
     #noise = model[0] + model[1] * action1 + model[2] * state1 + model[3] * mediator1 + model[4] * action1 * state1 + model[5] * action1 * mediator1 + model[6] * state1 * mediator1 + model[7] * action1 * state1 * mediator1
@@ -66,6 +71,8 @@ def true_ratio_function(state, policy = "target", return_all = False):
             ratio = [0.5207450263918821,1.7684599385521451]
         elif policy == "control":
             ratio = [1.5199193877713393,0.16633682949416845]
+        elif policy == 'G':
+            ratio = [1.4923034101190835, 0.21061758537227568]
     else:
         if policy == "target":
             numerator = 0.3207236581709146 * state1
@@ -73,6 +80,9 @@ def true_ratio_function(state, policy = "target", return_all = False):
         elif policy == "control":
             numerator = 0.9361090004997501 * state1
             numerator += (1.0 - 0.9361090004997501) * (1.0 - state1)
+        elif policy == "G":
+            numerator = 0.9191004897551226 * state1
+            numerator += (1.0 - 0.9191004897551226) * (1.0 - state1)
 
         denominator = 0.6158938480759618 * state1
         denominator += (1.0 - 0.6158938480759618) * (1.0 - state1)
@@ -93,6 +103,9 @@ def false_ratio_function(state, policy = "target"):
         ps_one += .25
         ps_0 -= .25
     elif policy == "control":
+        ps_one -= .3
+        ps_0 += .3
+    elif policy == "G":
         ps_one -= .3
         ps_0 += .3
     state1 = np.copy(state).flatten()
@@ -128,17 +141,14 @@ def true_reward_function(state, action, mediator):
     return true_rmean
 
 def false_reward_function(state, action, mediator):
-    #true_rmean = true_reward_function(state, action, mediator)
-    #noise_rmean = true_rmean + np.random.normal(loc=-1, scale=1, size=true_rmean.shape[0])
     state1 = np.copy(state).flatten()
     action1 = np.copy(action).flatten()
     mediator1 = np.copy(mediator).flatten()
     true_rmean = true_reward_function(state, action, mediator)
     model = np.random.normal(loc=-1, scale=1, size=8)
     noise = model[0] + model[1] * action1 + model[2] * state1 + model[3] * mediator1 + model[4] * action1 * state1 + model[5] * action1 * mediator1 + model[6] * state1 * mediator1 + model[7] * action1 * state1 * mediator1
-    noise_rmean = true_rmean + noise#10*np.random.normal(loc=-1, scale=1, size=true_rmean.shape[0])
-    return noise_rmean
-    
+    noise_rmean = true_rmean + noise
+    return noise_rmean    
 
 def true_pa_function(state, action, return_true_pa_one = False):
     state1 = np.copy(state).flatten()
@@ -163,11 +173,12 @@ def true_eta_values():
     true_eta_pi = 2.39701065
     true_eta_pi_a0 = 3.67369661
     true_eta_pi_a0star = 4.89616138
+    true_eta_G = 7.87840782
     true_eta_a0 = 7.96309271
-    return true_eta_pi, true_eta_pi_a0, true_eta_pi_a0star, true_eta_a0
+    return true_eta_pi, true_eta_pi_a0, true_eta_pi_a0star, true_eta_G, true_eta_a0
 
 def false_eta_values():
     true_eta = true_eta_values()
-    noise = np.random.normal(loc=1.5, scale=1, size=4)
+    noise = np.random.normal(loc=1.5, scale=1, size=5)
     noise_eta_pi = true_eta + noise
     return noise_eta_pi
