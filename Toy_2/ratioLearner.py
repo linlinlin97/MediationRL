@@ -101,10 +101,11 @@ class RatioLinearLearner:
         np.random.seed(1)        
         psi = self.feature_engineering(test_dataset['state'])
         psi_next = self.feature_engineering(test_dataset['next_state'])
-
+        
         estimate_pa = self.palearner.get_pa_prediction(test_dataset['state'], test_dataset['action'])
-        target_pa = self.policy_pa(self.target_policy, test_dataset['state'], test_dataset['action'])
-        control_pa = self.policy_pa(self.control_policy, test_dataset['state'], test_dataset['action'])
+        target_pa = self.target_policy(state = test_dataset['state'], dim_state = self.dim_state,
+                                           action=test_dataset['action']).flatten()
+        control_pa = self.control_policy(state = test_dataset['state'], dim_state = self.dim_state, action = test_dataset['action']).flatten()
         pa_ratio_target = target_pa / estimate_pa
         pa_ratio_control = control_pa / estimate_pa
         
