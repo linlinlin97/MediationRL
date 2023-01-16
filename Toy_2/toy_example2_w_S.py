@@ -37,20 +37,22 @@ def toy_robust(num_trajectory, num_time, seed):
     
     est_obj0.estimate_DE_ME_SE()
     est_value = est_obj0.est_DEMESE
-    DE_error_TR = est_value[0] - true_DE
-    ME_error_TR = est_value[1] - true_ME
-    SE_error_TR = est_value[2] - true_SE
-    DE_error_Direct = est_value[3] - true_DE
-    ME_error_Direct = est_value[4] - true_ME
-    SE_error_Direct = est_value[5] - true_SE
-    DE_error_indep = est_value[6] - true_DE
-    ME_error_indep = est_value[7] - true_ME
-    SE_error_indep = np.nan
+    IDE_error_TR = est_value[0] - true_DE
+    IME_error_TR = est_value[1] - true_ME
+    IDE_error_Direct = est_value[2] - true_DE
+    IME_error_Direct = est_value[3] - true_ME
+    IDE_error_WIS1 = est_value[4] - true_DE
+    IME_error_WIS1 = est_value[5] - true_ME
+    IDE_error_WIS2 = est_value[6] - true_DE
+    IME_error_WIS2 = est_value[7] - true_ME
+    IDE_error_indep = est_value[8] - true_DE
+    IME_error_indep = est_value[9] - true_ME
       
-    return [DE_error_TR, ME_error_TR, SE_error_TR, 
-            DE_error_Direct, ME_error_Direct, SE_error_Direct,
-            DE_error_indep, ME_error_indep, SE_error_indep,
+    return [IDE_error_TR, IME_error_TR, IDE_error_Direct, IME_error_Direct,
+            IDE_error_WIS1, IME_error_WIS1, IDE_error_WIS2, IME_error_WIS2,
+            IDE_error_indep, IME_error_indep,
             num_trajectory, num_time, seed]
+
 
 def toy_robust_star(args):
     return toy_robust(*args)
