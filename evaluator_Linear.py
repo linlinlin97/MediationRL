@@ -110,7 +110,7 @@ class evaluator:
     
     def estimate_DE_ME_SE(self):
         data_num = self.N * self.T
-        self.ind_est = np.array([range(data_num)] * 16, dtype=float)
+        self.ind_est = np.array([range(data_num)] * 17, dtype=float)
         #Multiply Robust - Related
         self._Q_terms()
         termI1, termI2, termI3, termI4, termI5 = self._I_terms(data_num)
@@ -169,7 +169,10 @@ class evaluator:
         self.ind_est[14] = self.compute_base_DE(data_num, self.state, self.action, self.reward, self.mediator, self.time_idx)
         #base ME
         self.ind_est[15] = self.compute_base_ME(data_num, self.state, self.action, self.reward, self.mediator, self.time_idx)
-
+        
+        #MR-Total Effect
+        self.ind_est[16] = self.ind_est[0] + self.ind_est[1] + self.ind_est[2] + self.ind_est[3]
+        
         self.est_DEMESE = np.mean(self.ind_est,1)
         if data_num > 100:
             self.se_DEMESE = np.array([np.mean(self.ind_est[:,i*self.T:(i+1)*self.T],1) for i in range(self.N)]).std(0)/np.sqrt(self.N)
