@@ -20,8 +20,8 @@ def summary(out_df, N_range, T_range):
     rep = int(len(result)/(5*NT_pairs))
     result["correct_model"] = (["All Correct"]*rep+["M1"]*rep+["M2"]*rep+["M3"]*rep+["All Incorrect"]*rep)*NT_pairs#[""]none*rep
     
-    M1_idx = result[result.correct_model=='M1'].index.tolist()
-    result.iloc[M1_idx, [5,6,10,11]] = np.nan
+    #M1_idx = result[result.correct_model=='M1'].index.tolist()
+    #result.iloc[M1_idx, [5,6,10,11]] = np.nan
     return result
 
 def plot(result, x='NT'):

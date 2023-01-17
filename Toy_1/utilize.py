@@ -126,7 +126,7 @@ def true_pm_function(state, action, mediator,return_pm_one = False):
 def false_pm_function(state, action, mediator):
     mediator1 = np.copy(mediator).flatten()
     true_pm_one = true_pm_function(state, action, mediator, return_pm_one = True)
-    noise_pm_one = true_pm_one * np.random.uniform(low=0.7, high=1.2, size= true_pm_one.shape[0])#1)#
+    noise_pm_one = true_pm_one * np.random.uniform(low=0.1, high=3, size= true_pm_one.shape[0])#1)#
     noise_pm_one = np.clip(noise_pm_one, a_min=0.01, a_max=.99)
     noise_pm = mediator1*noise_pm_one + (1.0-mediator1)*(1.0-noise_pm_one)
     return noise_pm
