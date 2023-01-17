@@ -18,7 +18,7 @@ def summary(out_df, N_range, T_range):
     result['DME_MSE'] = np.log(result['DME_error']**2)
     NT_pairs = len(result.groupby(['N','T']).size())
     rep = int(len(result)/(5*NT_pairs))
-    result["correct_model"] = (["All True"]*rep+["M1"]*rep+["M2"]*rep+["M3"]*rep+["All False"]*rep)*NT_pairs#[""]none*rep
+    result["correct_model"] = (["All Correct"]*rep+["M1"]*rep+["M2"]*rep+["M3"]*rep+["All Incorrect"]*rep)*NT_pairs#[""]none*rep
     
     M1_idx = result[result.correct_model=='M1'].index.tolist()
     result.iloc[M1_idx, [5,6,10,11]] = np.nan
@@ -28,7 +28,7 @@ def plot(result, x='NT'):
     fig, ((ax1, ax2, ax3, ax4) ,(ax5, ax6, ax7, ax8)) = plt.subplots(nrows=2, ncols=4, sharex=True, sharey=False, figsize = (10,5))
     
     COLORS = sns.color_palette("colorblind")
-    palette = {"All True":COLORS[0],"M1":COLORS[1],"M2":COLORS[2],"M3":COLORS[3], "All False":COLORS[4]}
+    palette = {"All Correct":COLORS[0],"M1":COLORS[1],"M2":COLORS[2],"M3":COLORS[3], "All Incorrect":COLORS[4]}
     #COLORS = sns.color_palette("Set2")
     #palette = {name : color for name, color in zip(["M1& M2 & M3","M1","M2","M3","None"], COLORS)}
 
