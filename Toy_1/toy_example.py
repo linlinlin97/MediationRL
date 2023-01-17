@@ -166,5 +166,5 @@ Error[num_time] = dict()
 for num_trajectory in np.arange(1, 11) * 30:
     Error[num_time][num_trajectory] = MC_toy_robust(nrep, num_trajectory, num_time)
     
-    with open("robust_final_test.txt","wb") as fp:
+    with open("robust_final.txt","wb") as fp:
         pickle.dump(Error, fp)
