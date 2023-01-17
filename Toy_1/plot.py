@@ -44,8 +44,9 @@ def plot(result, x='NT'):
                        ,linewidth = 2.0
                        ,markers = True
                         )
-    ax1.set_title('IDE')
-    ax1.axes.set_ylabel("bias")
+    ax1.set_title('IDE', fontsize = 18)
+    ax1.tick_params(axis='y', labelsize=11)
+    ax1.axes.set_ylabel("bias", fontsize = 18)
     
     ax2 = sns.lineplot(data=result
                          , x=x, y="IME_error"
@@ -59,8 +60,8 @@ def plot(result, x='NT'):
                        ,linewidth = 2.0
                        ,markers = True
                         )
-    ax2.set_title('IME')
-    #ax2.axes.set_ylabel("ME")
+    ax2.set_title('IME', fontsize = 18)
+    ax2.tick_params(axis='y', labelsize=11)
     ax2.set(ylabel=None)
     
     ax3 = sns.lineplot(data=result
@@ -75,8 +76,8 @@ def plot(result, x='NT'):
                        ,linewidth = 2.0
                        ,markers = True
                         )
-    ax3.set_title('DDE')
-    #ax3.axes.set_ylabel("SE")
+    ax3.set_title('DDE', fontsize = 18)
+    ax3.tick_params(axis='y', labelsize=11)
     ax3.set(ylabel=None)
     
     ax4 = sns.lineplot(data=result
@@ -91,7 +92,8 @@ def plot(result, x='NT'):
                        ,linewidth = 2.0
                        ,markers = True
                         )
-    ax4.set_title('DME')
+    ax4.set_title('DME', fontsize = 18)
+    ax4.tick_params(axis='y', labelsize=11)
     ax4.set(ylabel=None)
 
 
@@ -107,7 +109,9 @@ def plot(result, x='NT'):
                        ,linewidth = 2.0
                        ,markers = True
                         )
-    ax5.axes.set_ylabel("logMSE")
+    ax5.axes.set_ylabel("logMSE", fontsize = 18)
+    ax5.tick_params(axis='x', labelsize=11)
+    ax5.axes.set_xlabel(x,fontsize = 12)
     
     
     ax6 = sns.lineplot(data=result
@@ -124,6 +128,8 @@ def plot(result, x='NT'):
                         )
 
     ax6.set(ylabel=None)
+    ax6.tick_params(axis='x', labelsize=11)
+    ax6.axes.set_xlabel(x,fontsize = 12)
     
     ax7 = sns.lineplot(data=result
                          , x=x, y="DDE_MSE"
@@ -138,6 +144,8 @@ def plot(result, x='NT'):
                        ,markers = True
                         )
     ax7.set(ylabel=None)
+    ax7.tick_params(axis='x', labelsize=11)
+    ax7.axes.set_xlabel(x,fontsize = 12)
     
     ax8 = sns.lineplot(data=result
                          , x=x, y="DME_MSE"
@@ -152,6 +160,8 @@ def plot(result, x='NT'):
                        ,markers = True
                         )
     ax8.set(ylabel=None)
+    ax8.tick_params(axis='x', labelsize=11)
+    ax8.axes.set_xlabel(x,fontsize = 12)
 
     handles, labels = ax1.get_legend_handles_labels()
     #handles, labels = [(a + b) for a, b in zip(ax1.get_legend_handles_labels(), ax3.get_legend_handles_labels())]
@@ -169,4 +179,4 @@ def plot(result, x='NT'):
     ax8.get_legend().remove()
     plt.tight_layout()
     plt.show()
-    fig.savefig('robust_Final_SE_decomp', bbox_inches='tight')
+    fig.savefig('robust_Final', bbox_inches='tight')
