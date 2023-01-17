@@ -46,8 +46,9 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax1.set_title('IDE (iid)')
-    ax1.axes.set_ylabel("bias")
+    ax1.set_title('IDE (i.i.d. S)', fontsize = 18)
+    ax1.tick_params(axis='y', labelsize=11)
+    ax1.axes.set_ylabel("bias", fontsize = 18)
     
     ax2 = sns.lineplot(data=result_iid
                          , x=x, y="IME_error"
@@ -61,7 +62,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax2.set_title('IME (iid)')
+    ax2.set_title('IME (i.i.d. S)', fontsize = 18)
+    ax2.tick_params(axis='y', labelsize=11)
     ax2.set(ylabel=None)
     
     ax3 = sns.lineplot(data=result_w_state
@@ -76,7 +78,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax3.set_title('IDE (with State Transition)')
+    ax3.set_title('IDE (dep. S)', fontsize = 18)
+    ax3.tick_params(axis='y', labelsize=11)
     ax3.set(ylabel=None)
     
     ax4 = sns.lineplot(data=result_w_state
@@ -91,7 +94,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax4.set_title('IME (with State Transition)')
+    ax4.set_title('IME (dep. S)', fontsize = 18)
+    ax4.tick_params(axis='y', labelsize=11)
     ax4.set(ylabel=None)
     
     ax5 = sns.lineplot(data=result_iid
@@ -106,7 +110,9 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax5.axes.set_ylabel("logMSE")
+    ax5.axes.set_ylabel("logMSE", fontsize = 18)
+    ax5.tick_params(axis='x', labelsize=11)
+    ax5.axes.set_xlabel(x,fontsize = 12)
 
 
     ax6 = sns.lineplot(data=result_iid
@@ -122,6 +128,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        markers = True
                         )
     ax6.set(ylabel=None)
+    ax6.tick_params(axis='x', labelsize=11)
+    ax6.axes.set_xlabel(x,fontsize = 12)
     
     
     ax7 = sns.lineplot(data=result_w_state
@@ -137,6 +145,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        markers = True
                         )
     ax7.set(ylabel=None)
+    ax7.tick_params(axis='x', labelsize=11)
+    ax7.axes.set_xlabel(x,fontsize = 12)
 
 
     ax8 = sns.lineplot(data=result_w_state
@@ -152,6 +162,8 @@ def plot(result_iid, result_w_state, x='NT'):
                        markers = True
                         )
     ax8.set(ylabel=None)
+    ax8.tick_params(axis='x', labelsize=11)
+    ax8.axes.set_xlabel(x,fontsize = 12)
 
     handles, labels = ax1.get_legend_handles_labels()
     lgd = fig.legend(handles, labels, loc='lower center', ncol = len(labels)
