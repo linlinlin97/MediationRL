@@ -78,7 +78,7 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax3.set_title('IDE (dep. S)', fontsize = 18)
+    ax3.set_title('IDE (w. S transit.)', fontsize = 18)
     ax3.tick_params(axis='y', labelsize=11)
     ax3.set(ylabel=None)
     
@@ -94,7 +94,7 @@ def plot(result_iid, result_w_state, x='NT'):
                        ,linewidth = 2.0,
                        markers = True
                         )
-    ax4.set_title('IME (dep. S)', fontsize = 18)
+    ax4.set_title('IME (w. S transit.)', fontsize = 18)
     ax4.tick_params(axis='y', labelsize=11)
     ax4.set(ylabel=None)
     
