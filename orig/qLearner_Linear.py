@@ -10,7 +10,7 @@ class Qlearner():
                  Q_settings = {'scaler': 'Identity', 'product_tensor': True, 'beta': 3/7, 'include_intercept': False,
                                'expectation_MCMC_iter_Q3': 100, 'expectation_MCMC_iter_Q_diff':100, 'penalty': 10**(-9),
                               'd': 3, 'min_L': 7, "t_dependent_Q": False}, 
-                 seed = 0, t_depend_target = False):
+                 seed = 0, t_depend_target = False, nature_decomp = False):
         np.random.seed(seed)
         
         self.state = data['state']
@@ -31,6 +31,7 @@ class Qlearner():
         self.L = int(np.sqrt((self.NT)**self.beta))
         self.d = Q_settings['d']
         self.min_L = Q_settings['min_L']
+        self.nature_decomp =  nature_decomp
         
         self.tuples_array = np.array(self.tuples)
         self.state_mediator_col = list(np.arange(self.dim_state)) + list(np.arange(self.dim_state+1,self.dim_state+1+self.dim_mediator)) 
@@ -58,10 +59,15 @@ class Qlearner():
         self.expectation_MCMC_iter_Q_diff = Q_settings['expectation_MCMC_iter_Q_diff']
         self.l2penalty = Q_settings['penalty']
         
-        self.target_policy = target_policy
-        #control_policy
-        self.control_policy = control_policy
-        self.a0 = control_policy(get_a = True)
+        if self.nature_decomp:
+            self.target_policy = control_policy
+            #control_policy
+            self.control_policy = target_policy
+        else:
+            self.target_policy = target_policy
+            #control_policy
+            self.control_policy = control_policy
+            #self.a0 = control_policy(get_a = True)
         self.t_depend_target = t_depend_target
         
         self.U = self._U4all(self.tuples)
@@ -72,39 +78,55 @@ class Qlearner():
         self.Er_Sa0m = self._Er_Sa0m()
         
     def est_Q1(self):
-        #Q1
-        #t0 = time.time()
+        #Q1-->for pie if nature_decopm==False, for pi_0 otherwise
         self.eta_pie, self.Q1_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_target)
         
     def est_Q2(self):
-        #Q2
-        Er_Sa0M = self.rewardlearner.get_reward_prediction(self.state, self.a0, self.mediator)
+        #Q2-->=Q2 if nature_decopm==False, =Q6 in appendix otherwise
+        Er_Sa0M = self._Er_Sa0M()
+        #Er_Sa0M = self.rewardlearner.get_reward_prediction(self.state, self.a0, self.mediator)
         self.eta_piea0, self.Q2_est_beta = self.est_beta_eta(Er_Sa0M, self.U, self.Sigma_target)
         
     def est_Q3(self):
-        #Q3 
+        #Q3 -->=Q3 if nature_decopm==False, =Q7 in appendix otherwise
         self.eta_piea0star, self.Q3_est_beta = self.est_beta_eta(self.Er_Sa0m, self.U, self.Sigma_target)
         
     def est_Q4(self):
-        #Q4
+        #Q4-->=Q4 if nature_decopm==False, =Q8 in appendix otherwise
         self.eta_G, self.Q4_est_beta = self.est_beta_eta(self.Er_Sa0m, self.U, self.Sigma_G)        
         
     def est_Q5(self):
-        #Q5
+        #Q5-->for pi0 if nature_decopm==False, for pi_e otherwise
         self.eta_a0, self.Q5_est_beta = self.est_beta_eta(self.R, self.U, self.Sigma_control)
+    
     
     def est_Qdiffs(self):
         self.Q1_diff, self.Q2_diff, self.Q3_diff, self.Q4_diff_1, self.Q4_diff_2, self.Q5_diff = self._Q_diff(self.state, self.mediator, self.action, self.next_state)
         
     def _Er_Sa0m(self):
         Er_Sa0m = np.zeros(self.NT, dtype=float)
-        for rep in range(self.expectation_MCMC_iter_Q3):
-            #np.random.seed(rep)
-            m_Sa0 = self.pmlearner.sample_m(self.state, self.a0, random = True)
-            r_Sa0m = self.rewardlearner.get_reward_prediction(self.state, self.a0, m_Sa0)
-            Er_Sa0m = self.update_exp(rep, Er_Sa0m, r_Sa0m.reshape((-1,)))
+        for a in self.unique_action:       
+            pi0_a_S = self.control_policy(self.state, self.dim_state, a)
+            if np.sum(pi0_a_S) > 0:
+                Er_Sam = np.zeros(self.NT, dtype=float)
+                for rep in range(self.expectation_MCMC_iter_Q3):
+                    #np.random.seed(rep)
+                    m_Sa = self.pmlearner.sample_m(self.state, np.array([a]), random = True)
+                    r_Sam = self.rewardlearner.get_reward_prediction(self.state, np.array([a]), m_Sa)
+                    Er_Sam = self.update_exp(rep, Er_Sam, r_Sam.reshape((-1,)))
+                Er_Sa0m += pi0_a_S * Er_Sam
         return Er_Sa0m
             
+    def _Er_Sa0M(self):
+        Er_Sa0M = np.zeros(self.NT, dtype=float)
+        for a in self.unique_action:       
+            pi0_a_S = self.control_policy(self.state, self.dim_state, a)
+            Er_SaM = self.rewardlearner.get_reward_prediction(self.state, np.array([a]), self.mediator)
+            Er_Sa0M += pi0_a_S * Er_SaM
+        #else:
+        #    Er_Sa0M = self.rewardlearner.get_reward_prediction(self.state, self.a0, self.mediator)
+        return Er_Sa0M
+    
     def est_beta_eta(self, Y_all, U, Sigma_hat):
         est_beta = self._beta_hat(Y_all, U, Sigma_hat)
         eta = self.eta_hat(est_beta)
