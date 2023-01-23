@@ -4,8 +4,7 @@ from sklearn.kernel_approximation import RBFSampler
 
 class RatioLinearLearner:
     def __init__(self, dataset, target_policy, control_policy, palearner, pmlearner,
-                 ndim=100, truncate=20, dim_state = 1, dim_mediator = 2, l2penalty = 1.0, 
-                 t_depend_target = False, nature_decomp = False):
+                 ndim=100, truncate=20, dim_state = 1, dim_mediator = 2, l2penalty = 1.0, t_depend_target = False):
         
         self.dim_state = dim_state
         self.dim_mediator = dim_mediator
@@ -26,7 +25,6 @@ class RatioLinearLearner:
         self.truncate = truncate
         self.l2penalty = l2penalty
         self.t_depend_target = t_depend_target
-        self.nature_decomp = nature_decomp
         
         self.palearner = palearner
         self.pmlearner = pmlearner
@@ -51,10 +49,7 @@ class RatioLinearLearner:
         pa_ratio_target = self.target_pa / self.estimate_pa
         pa_ratio_control = self.control_pa / self.estimate_pa
         rho = self.rho_SAM(self.state, self.action, self.mediator, self.time_idx)
-        if self.nature_decomp:
-            pam_ratio_G = self.target_pa / self.estimate_pa * rho
-        else:
-            pam_ratio_G = self.control_pa / self.estimate_pa * rho
+        pam_ratio_G = self.control_pa / self.estimate_pa * rho
         # print(np.mean(ratio)) # close to 1 if behaviour and target are the same
         
         #target_ratio_learning
@@ -153,15 +148,11 @@ class RatioLinearLearner:
         pM_S = np.zeros(data_num, dtype=float)
         for a in self.unique_action:
             pM_Sa = self.pmlearner.get_pm_prediction(state, np.array([a]), mediator)
-            if self.nature_decomp:
-                pi0_a = self.control_policy(state, self.dim_state, a)
-                pM_S += pi0_a * pM_Sa
+            if self.t_depend_target:
+                pie_a = self.target_policy(state, self.dim_state, a, time_idx)
             else:
-                if self.t_depend_target:
-                    pie_a = self.target_policy(state, self.dim_state, a, time_idx)
-                else:
-                    pie_a = self.target_policy(state, self.dim_state, a)
-                pM_S += pie_a * pM_Sa
+                pie_a = self.target_policy(state, self.dim_state, a)
+            pM_S += pie_a * pM_Sa
             
         pM_SA = self.pmlearner.get_pm_prediction(state, action, mediator)
         
