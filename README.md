@@ -6,7 +6,7 @@ This repository is the official implementation of the paper [A Reinforcement Lea
 
 ## Learners for Nuisance Functions
 1. `probLearner.py`: code to learn density functions, including $r$, $p_m$, and $\pi_b$.
-2. `qLearner_Linear.py`: code to learn all $Q$ functions and $\eta$ .
+2. `qLearner_Linear.py`: code to learn all $Q$ functions and $\eta$.
 3. `ratioLearner.py`: code to learn state ratios, including $\omega^{\pi_e}$, $\omega^{\pi_0}$, and $\omega^{G_0}$.
 4. `evaluator_Linear.py`: major code to infer all effect components, including implementations of MR, MIS and DM estimators.
 
