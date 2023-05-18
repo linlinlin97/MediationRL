@@ -29,3 +29,19 @@ This repository is the official implementation of the paper [A Reinforcement Lea
 1. Download all the codes in the folder corresponding to the experimentation;
 2. Run the experiment script to get the experiment results;
 3. Analyze the results and get the figure by running the corresponding code in either `Toy_example.ipynb` or `Summary.ipynb`, whichever is included in the folder.
+
+## Citations
+Please cite the following publications if you make use of the material here.
+- Ge, L., Wang, J., Shi, C., Wu, Z., & Song, R. (2023). A Reinforcement Learning Framework for Dynamic Mediation Analysis. arXiv preprint arXiv:2301.13348.
+
+```
+@article{ge2023reinforcement,
+  title={A Reinforcement Learning Framework for Dynamic Mediation Analysis},
+  author={Ge, Lin and Wang, Jitao and Shi, Chengchun and Wu, Zhenke and Song, Rui},
+  journal={arXiv preprint arXiv:2301.13348},
+  year={2023}
+}
+```
+## License
+
+All content in this repository is licensed under the MIT license.
