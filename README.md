@@ -1,6 +1,6 @@
 # A Reinforcement Learning Framework for Dynamic Mediation Analysis
 
-This repository is the official implementation of the paper [A Reinforcement Learning Framework for Dynamic Mediation Analysis]() in Python. 
+This repository is the official implementation of the paper [A Reinforcement Learning Framework for Dynamic Mediation Analysis]()(ICML 2023) in Python. 
 
 >📋  **Abstract**: Mediation analysis learns the causal effect transmitted via mediator variables between treatments and outcomes and receives increasing attention in various scientific domains to elucidate causal relations. Most existing works focus on point-exposure studies where each subject only receives one treatment at a single time point. However, there are a number of applications (e.g., mobile health) where the treatments are sequentially assigned over time and the dynamic mediation effects are of primary interest. Proposing a reinforcement learning (RL) framework, we are the first to evaluate dynamic mediation effects in settings with infinite horizons. We decompose the average treatment effect into an immediate direct effect, an immediate mediation effect, a delayed direct effect, and a delayed mediation effect. Upon the identifiability of each effect component, we further develop robust and semi-parametrically efficient estimators under the RL framework to infer these causal effects. The superior performance of the proposed method is demonstrated through extensive numerical studies, theoretical results, and an analysis of a mobile health dataset.
 
