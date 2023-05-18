@@ -19,7 +19,8 @@ This repository is the official implementation of the paper [A Reinforcement Lea
 1. `/Toy_1`: There are all code files used for the toy example I, showing the robustness of MR estimators. `toy_example.py` is the corresponding experiment script.
 2. `/Toy_2`: There are all code files used for the toy example II, showing the necessity of taking the state transition into account. `toy_example2_iid.py` and `toy_example2_w_S.py` are the corresponding experiment scripts.
 3. `/Semi_Synthetic`: There are all code filed used for the semi-synthetic experiments, showing the superior performance of MR estimators. `estimate.py` and `estimate_T.py` are the corresponding experiment scripts.
-2. `/Real_Case_Study`: There are codes used in the real case study, including algorithms learning $Q$ function for the behavior policy, from which we obtain the optimal policy. Further, a cross validation script used to get effect estimation for optimal policy is provided.
+4. `/Real_Case_Study`: There are codes used in the real case study, including algorithms learning $Q$ function for the behavior policy, from which we obtain the optimal policy. Further, a cross validation script used to get effect estimation for optimal policy is provided.
+5. `/Additional_Numerical_Results`: There are codes used in the additional numerical analysis.
 
 ## Others
 1. `/Natural Decomposition`: Within the folder, we provide codes related to the alternative effect decomposition discussed in Appendix B.
