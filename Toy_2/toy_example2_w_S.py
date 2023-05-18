@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO,
 simulator = Simulator(model_type='toy', dim_state=1)
 
 # truth
-true_DE, true_ME, true_SE = -1.27668596, -1.2224647699999998, -3.06693133
+true_IDE,true_IME,true_DDE, true_DME = -1.27668596, -1.2224647699999998, -2.98224644, -0.08468489000000012
 
 def toy_robust(num_trajectory, num_time, seed):
     simulator.sample_trajectory(num_trajectory, num_time, seed)
@@ -37,20 +37,31 @@ def toy_robust(num_trajectory, num_time, seed):
     
     est_obj0.estimate_DE_ME_SE()
     est_value = est_obj0.est_DEMESE
-    IDE_error_TR = est_value[0] - true_DE
-    IME_error_TR = est_value[1] - true_ME
-    IDE_error_Direct = est_value[2] - true_DE
-    IME_error_Direct = est_value[3] - true_ME
-    IDE_error_WIS1 = est_value[4] - true_DE
-    IME_error_WIS1 = est_value[5] - true_ME
-    IDE_error_WIS2 = est_value[6] - true_DE
-    IME_error_WIS2 = est_value[7] - true_ME
-    IDE_error_indep = est_value[8] - true_DE
-    IME_error_indep = est_value[9] - true_ME
-      
-    return [IDE_error_TR, IME_error_TR, IDE_error_Direct, IME_error_Direct,
-            IDE_error_WIS1, IME_error_WIS1, IDE_error_WIS2, IME_error_WIS2,
-            IDE_error_indep, IME_error_indep,
+    IDE_error_TR = est_value[0] - true_IDE
+    IME_error_TR = est_value[1] - true_IME
+    DDE_error_TR = est_value[2] - true_DDE
+    DME_error_TR = est_value[3] - true_DME
+    IDE_error_Direct = est_value[4] - true_IDE
+    IME_error_Direct = est_value[5] - true_IME
+    DDE_error_Direct = est_value[6] - true_DDE
+    DME_error_Direct = est_value[7] - true_DME
+    IDE_error_WIS1 = est_value[8] - true_IDE
+    IME_error_WIS1 = est_value[9] - true_IME
+    DDE_error_WIS1 = est_value[10] - true_DDE
+    DME_error_WIS1 = est_value[11] - true_DME
+    IDE_error_WIS2 = est_value[12] - true_IDE
+    IME_error_WIS2 = est_value[13] - true_IME
+    DDE_error_WIS2 = np.nan
+    DME_error_WIS2 = np.nan
+    IDE_error_indep = est_value[14] - true_IDE
+    IME_error_indep = est_value[15] - true_IME
+    DDE_error_indep = np.nan
+    DME_error_indep = np.nan  
+    return [IDE_error_TR, IME_error_TR, DDE_error_TR, DME_error_TR, 
+            IDE_error_Direct, IME_error_Direct, DDE_error_Direct, DME_error_Direct,
+            IDE_error_WIS1, IME_error_WIS1, DDE_error_WIS1, DME_error_WIS1, 
+            IDE_error_WIS2, IME_error_WIS2, DDE_error_WIS2, DME_error_WIS2, 
+            IDE_error_indep, IME_error_indep, DDE_error_indep, DME_error_indep, 
             num_trajectory, num_time, seed]
 
 
@@ -76,5 +87,5 @@ Error[num_time] = dict()
 for num_trajectory in np.arange(1, 11) * 30:
     Error[num_time][num_trajectory] = MC_toy_robust(nrep, num_trajectory, num_time)
     
-    with open("Toy_2_w_state.txt","wb") as fp:
+    with open("Toy_2_w_state_FULL.txt","wb") as fp:
         pickle.dump(Error, fp)
