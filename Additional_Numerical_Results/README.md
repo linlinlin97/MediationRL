@@ -1,4 +1,4 @@
-# Dynamic Mediation Analysis-Rebuttal
+# Dynamic Mediation Analysis-Additional Numerical Results
 
 ## A. Updated Results for Sec 7.2 and Sec 7.3 with Additional Baseline Methods
 
