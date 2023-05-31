@@ -4,6 +4,26 @@ This repository is the official implementation of the paper [A Reinforcement Lea
 
 >📋  **Abstract**: Mediation analysis learns the causal effect transmitted via mediator variables between treatments and outcomes and receives increasing attention in various scientific domains to elucidate causal relations. Most existing works focus on point-exposure studies where each subject only receives one treatment at a single time point. However, there are a number of applications (e.g., mobile health) where the treatments are sequentially assigned over time and the dynamic mediation effects are of primary interest. Proposing a reinforcement learning (RL) framework, we are the first to evaluate dynamic mediation effects in settings with infinite horizons. We decompose the average treatment effect into an immediate direct effect, an immediate mediation effect, a delayed direct effect, and a delayed mediation effect. Upon the identifiability of each effect component, we further develop robust and semi-parametrically efficient estimators under the RL framework to infer these causal effects. The superior performance of the proposed method is demonstrated through extensive numerical studies, theoretical results, and an analysis of a mobile health dataset.
 
+In this paper, we consider a mediated Markov decision process (MMDP) as illustrated below.
+<p align="center" width="100%">
+    <img width="33%" src="./Proposed MDP.jpg">
+</p>
+
+The main idea of the paper is a **four-way effect decomposition**. Specifically, let $\textrm{TE}_t(\pi_e,\pi_0) = E^{\pi_e}[R_t] - E^{\pi_0}[R_t]$. We consider decomposing the $\textrm{TE}_t(\pi_e,\pi_0)$ into four effect components, such that
+$$\textrm{TE}_t(\pi_e,\pi_0) = \textrm{IDE}_t(\pi_e,\pi_0)+\textrm{IME}_t(\pi_e,\pi_0)+\textrm{DDE}_t(\pi_e,\pi_0)+\textrm{DME}_t(\pi_e,\pi_0),$$
+where i) the $\textrm{IDE}_t$ quantifies the direct treatment effect on the proximal outcome $R_t$; ii) the $\textrm{IME}_t$ evaluates the indirect effect mediated by $M_t$; iii) the $\textrm{DDE}_t$ quantifies how past actions directly impact the current outcome; and iv) the $\textrm{DME}_t$ measures the indirect past treatment effects mediated by past mediators. Averaging over $t$, we obtain a four-way decomposition of ATE as 
+$$\textrm{ATE} = \textrm{IDE} + \textrm{IME} + \textrm{DDE} + \textrm{DME}.$$
+
+As an illustration, let's consider $t=1$. The complete causal graph from actions to $R_1$ is depicted as follows.
+<p align="center" width="100%">
+    <img width="33%" src="./2-stage.png">
+</p>
+
+  - $\textrm{IDE}_1$ measures the causal effect along the path $A_1\to R_1$;
+  - $\textrm{IME}_1$ corresponds to the effect along the path $A_1\to M_1 \to R_1$;
+  - $\textrm{DDE}_1$ captures the causal effect along the path $A_0\to S_1\to\\{A_1, M_1\\}\to R_1$;
+  - $\textrm{DME}_1$ considers the path $A_0\to M_0 \to S_1 \to \\{A_1, M_1\\} \to R_1$.
+
 ## Learners for Nuisance Functions
 1. `probLearner.py`: code to learn density functions, including $r$, $p_m$, and $\pi_b$.
 2. `qLearner_Linear.py`: code to learn all $Q$ functions and $\eta$.
